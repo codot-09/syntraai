@@ -290,6 +290,9 @@ const SyntraApp = (() => {
         const { data: { user } } = await sb.auth.getUser();
         const slug = getWorkspaceSlug();
         if (!slug) {
+            if (pageKey === "subscription") {
+                return { session, user, workspace: null, slug: null };
+            }
             window.location.href = "workspace-create.html";
             return null;
         }
