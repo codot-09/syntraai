@@ -1,46 +1,62 @@
 <!DOCTYPE html>
-<html lang="uz">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SyntraAI | Subscription</title>
+    <title>SyntraAI | Workspace Subscription</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/app.css">
     <style>
+        .sub-layout {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
         .subscription-container {
-            max-width: 1100px;
-            margin: 60px auto;
-            padding: 0 20px;
+            width: 100%;
+            max-width: 1040px;
+            z-index: 10;
         }
         .plan-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 32px;
+            gap: 24px;
             margin-top: 48px;
         }
         .plan-card {
-            position: relative;
             display: flex;
             flex-direction: column;
-            padding: 40px;
+            padding: 48px 40px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+        .plan-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: translateY(-4px);
         }
         .plan-card.pro {
-            border: 2px solid var(--accent);
-            box-shadow: 0 0 30px rgba(99, 102, 241, 0.15);
+            border: 1px solid var(--accent);
+            background: rgba(99, 102, 241, 0.03);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         }
         .price-tag {
-            font-size: 48px;
+            font-size: 56px;
             font-weight: 800;
             font-family: 'Sora';
             margin: 24px 0;
+            letter-spacing: -2px;
         }
         .price-tag span {
             font-size: 16px;
             font-weight: 400;
-            opacity: 0.6;
+            opacity: 0.5;
+            letter-spacing: 0;
         }
         .feature-list {
             margin: 32px 0;
@@ -49,32 +65,37 @@
             flex-grow: 1;
         }
         .feature-list li {
-            margin-bottom: 14px;
+            margin-bottom: 16px;
             display: flex;
             align-items: center;
             gap: 12px;
             font-size: 15px;
+            opacity: 0.8;
         }
         .feature-list li::before {
-            content: "✓";
+            content: "→";
             color: var(--accent);
             font-weight: 800;
         }
-        .payment-instructions {
+        .payment-modal-content {
             text-align: center;
-            max-width: 500px;
-            margin: 0 auto;
+            padding: 20px;
         }
-        .card-number {
-            background: rgba(255,255,255,0.05);
-            padding: 16px;
-            border-radius: 12px;
-            font-family: monospace;
-            font-size: 20px;
-            letter-spacing: 2px;
-            border: 1px dashed rgba(255,255,255,0.2);
-            margin: 20px 0;
+        .card-box {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 24px;
+            border-radius: 16px;
+            font-family: 'Sora', monospace;
+            font-size: 22px;
+            letter-spacing: 3px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin: 24px 0;
             cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .card-box:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: var(--accent);
         }
     </style>
 </head>
@@ -82,72 +103,72 @@
     <div class="app-grid"></div>
     <div class="app-aurora"></div>
 
-    <div class="app-shell">
-        <aside class="sidebar" id="sidebar"></aside>
+    <div class="sub-layout">
+        <div class="subscription-container">
+            <header style="text-align: center;">
+                <div class="eyebrow">Pricing Plans</div>
+                <h1 style="font-size: 48px; margin-top: 12px;">Upgrade your workspace</h1>
+                <p class="panel-subtitle" style="max-width: 500px; margin: 12px auto 0;">Choose a plan to unlock professional features and scale your education operations.</p>
+            </header>
 
-        <main class="content">
-            <div class="subscription-container">
-                <header style="text-align: center; margin-bottom: 40px;">
-                    <div class="eyebrow">Pricing Plans</div>
-                    <h1 style="font-size: 42px;">Workspace-ni kuchaytiring</h1>
-                    <p class="panel-subtitle">Sizga mos keladigan tarif rejasini tanlang va barcha imkoniyatlardan foydalaning.</p>
-                </header>
+            <div class="plan-grid">
+                <div class="panel plan-card">
+                    <div class="panel-title" style="font-size: 20px;">Monthly Growth</div>
+                    <div class="panel-subtitle">Perfect for small teams</div>
+                    <div class="price-tag">$49<span>/month</span></div>
+                    <ul class="feature-list">
+                        <li>Unlimited leads & students</li>
+                        <li>Advanced payment analytics</li>
+                        <li>Group management tools</li>
+                        <li>CSV data exports</li>
+                    </ul>
+                    <button class="btn btn-secondary btn-block" onclick="openPayment('Monthly Growth', '$49')">Choose Monthly</button>
+                </div>
 
-                <div class="plan-grid">
-                    <div class="panel plan-card">
-                        <div class="panel-title">Monthly Growth</div>
-                        <div class="panel-subtitle">Kichik jamoalar uchun ideal</div>
-                        <div class="price-tag">$49 <span>/ oyiga</span></div>
-                        <ul class="feature-list">
-                            <li>Cheksiz leadlar va studentlar</li>
-                            <li>To'lovlar analitikasi</li>
-                            <li>Guruhlarni boshqarish</li>
-                            <li>CSV eksport imkoniyati</li>
-                        </ul>
-                        <button class="btn btn-secondary btn-block" onclick="openPayment('Monthly Growth', '$49')">Sotib olish</button>
-                    </div>
-
-                    <div class="panel plan-card pro">
-                        <div class="badge badge-primary" style="position: absolute; top: 20px; right: 20px;">Eng mashhur</div>
-                        <div class="panel-title">Yearly Scale</div>
-                        <div class="panel-subtitle">Katta akademiyalar uchun professional tanlov</div>
-                        <div class="price-tag">$399 <span>/ yiliga</span></div>
-                        <ul class="feature-list">
-                            <li>Barcha Growth imkoniyatlari</li>
-                            <li>Yillik obunada $189 tejash</li>
-                            <li>Workspace ustuvorligi</li>
-                            <li>VIP texnik qo'llab-quvvatlash</li>
-                        </ul>
-                        <button class="btn btn-primary btn-block" onclick="openPayment('Yearly Scale', '$399')">Hozir tejash</button>
-                    </div>
+                <div class="panel plan-card pro">
+                    <div class="badge badge-primary" style="position: absolute; top: 24px; right: 24px;">Recommended</div>
+                    <div class="panel-title" style="font-size: 20px;">Yearly Scale</div>
+                    <div class="panel-subtitle">For professional academies</div>
+                    <div class="price-tag">$399<span>/year</span></div>
+                    <ul class="feature-list">
+                        <li>Everything in Monthly plan</li>
+                        <li>Save $189 per year</li>
+                        <li>Priority workspace support</li>
+                        <li>Early access to AI features</li>
+                    </ul>
+                    <button class="btn btn-primary btn-block" onclick="openPayment('Yearly Scale', '$399')">Choose Yearly</button>
                 </div>
             </div>
-        </main>
+            
+            <p style="text-align: center; margin-top: 40px; opacity: 0.5; font-size: 14px;">
+                Secure payment processing. Subscription active within 24 hours of confirmation.
+            </p>
+        </div>
     </div>
 
     <div class="modal" id="paymentModal">
         <div class="modal-card">
             <div class="modal-header">
                 <div>
-                    <div class="modal-title">To'lov yo'riqnomasi</div>
+                    <div class="modal-title">Payment Instructions</div>
                     <div class="modal-subtitle" id="selectedPlanDisplay"></div>
                 </div>
-                <button class="btn btn-ghost" data-close-modal="paymentModal">Yopish</button>
+                <button class="btn btn-ghost" data-close-modal="paymentModal">Close</button>
             </div>
             
-            <div class="payment-instructions">
-                <p>Obunani faollashtirish uchun quyidagi kartaga kerakli summani o'tkazing:</p>
-                <div class="card-number" id="cardNumber" onclick="copyCard()">4413597601023524</div>
-                <p style="font-size: 14px; opacity: 0.7;">Karta raqami ustiga bossangiz nusxa olinadi.</p>
+            <div class="payment-modal-content">
+                <p style="opacity: 0.8;">Transfer the exact amount to the following card number to activate your subscription:</p>
+                <div class="card-box" id="cardNumber" onclick="copyCard()">4413597601023524</div>
+                <p style="font-size: 13px; opacity: 0.6; margin-bottom: 24px;">Click the card number to copy</p>
                 
-                <div class="panel" style="margin-top: 24px; text-align: left; background: rgba(99, 102, 241, 0.05);">
-                    <p><strong>Keyingi qadam:</strong></p>
-                    <p style="font-size: 14px; margin: 10px 0;">To'lov chekini (skrinshot) telegram orqali yuboring:</p>
-                    <a href="https://t.me/otabek_nabiyev1" target="_blank" class="btn btn-primary btn-block">Chekni yuborish (@otabek_nabiyev1)</a>
+                <div class="panel" style="text-align: left; background: rgba(99, 102, 241, 0.05); border-color: rgba(99, 102, 241, 0.2);">
+                    <p><strong>Final Step:</strong></p>
+                    <p style="font-size: 14px; margin: 8px 0 16px; opacity: 0.8;">Send your payment receipt (screenshot) via Telegram for verification:</p>
+                    <a href="https://t.me/otabek_nabiyev1" target="_blank" class="btn btn-primary btn-block">Send Receipt (@otabek_nabiyev1)</a>
                 </div>
                 
-                <p style="margin-top: 20px; font-size: 13px; color: var(--accent);">
-                    * To'lov tasdiqlangach, 24 soat ichida obuna faollashadi.
+                <p style="margin-top: 24px; font-size: 13px; color: var(--accent); font-weight: 500;">
+                    * Your workspace will be upgraded within 24 hours after verification.
                 </p>
             </div>
         </div>
@@ -156,17 +177,18 @@
     <script src="assets/app.js"></script>
     <script>
         function openPayment(plan, price) {
-            document.getElementById("selectedPlanDisplay").textContent = `${plan} — ${price}`;
+            document.getElementById("selectedPlanDisplay").textContent = `${plan} Plan — ${price}`;
             SyntraApp.openModal("paymentModal");
         }
 
         function copyCard() {
             const num = document.getElementById("cardNumber").textContent;
             navigator.clipboard.writeText(num);
-            SyntraApp.showToast("Nusxa olindi", "Karta raqami clipboardga saqlandi.");
+            SyntraApp.showToast("Copied to clipboard", "Card number is ready for transfer.");
         }
 
         window.addEventListener("load", async () => {
+            // Check for valid workspace but do not show sidebar
             await SyntraApp.requireWorkspace("subscription");
         });
     </script>
