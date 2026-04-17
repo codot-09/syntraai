@@ -44,9 +44,11 @@
                         </div>
                         <select class="select-field" id="statusFilter" style="max-width: 220px;">
                             <option value="all">All statuses</option>
-                            <option value="Yangi">Yangi</option>
-                            <option value="Suhbatda">Suhbatda</option>
-                            <option value="Yopildi">Yopildi</option>
+                            <option value="new">New</option>
+                            <option value="contacted">Contacted</option>
+                            <option value="lost">Lost</option>
+                            <option value="enrolled">Enrolled</option>
+                            <option value="unknown">Unknown</option>
                         </select>
                     </div>
                 </section>
@@ -90,9 +92,11 @@
                     <div class="field-group">
                         <label class="field-label" for="leadStatus">Status</label>
                         <select class="select-field" id="leadStatus">
-                            <option value="Yangi">Yangi</option>
-                            <option value="Suhbatda">Suhbatda</option>
-                            <option value="Yopildi">Yopildi</option>
+                            <option value="new">New</option>
+                            <option value="contacted">Contacted</option>
+                            <option value="lost">Lost</option>
+                            <option value="enrolled">Enrolled</option>
+                            <option value="unknown">Unknown</option>
                         </select>
                     </div>
                 </div>
@@ -136,24 +140,35 @@
         let workspaceContext;
         let allLeads = [];
         let groups = [];
+        let editingLead = null;
 
         function badgeForStatus(status) {
-            if (status === "Yopildi") return "badge-success";
-            if (status === "Suhbatda") return "badge-warning";
+            if (status === "enrolled") return "badge-success";
+            if (status === "contacted") return "badge-warning";
+            if (status === "lost") return "badge-danger";
             return "badge-primary";
         }
 
+        function normalizeLeadStatus(status) {
+            const value = String(status || "unknown").toLowerCase();
+            if (["new", "yangi"].includes(value)) return "new";
+            if (["contacted", "suhbatda"].includes(value)) return "contacted";
+            if (["enrolled", "yopildi"].includes(value)) return "enrolled";
+            if (value === "lost") return "lost";
+            return "unknown";
+        }
+
         function renderStats() {
-            const newLeads = allLeads.filter((lead) => lead.status === "Yangi").length;
-            const contacted = allLeads.filter((lead) => lead.status === "Suhbatda").length;
-            const closed = allLeads.filter((lead) => lead.status === "Yopildi").length;
-            const conversionRate = allLeads.length ? `${Math.round((closed / allLeads.length) * 100)}%` : "0%";
+            const newLeads = allLeads.filter((lead) => normalizeLeadStatus(lead.status) === "new").length;
+            const contacted = allLeads.filter((lead) => normalizeLeadStatus(lead.status) === "contacted").length;
+            const enrolled = allLeads.filter((lead) => normalizeLeadStatus(lead.status) === "enrolled").length;
+            const conversionRate = allLeads.length ? `${Math.round((enrolled / allLeads.length) * 100)}%` : "0%";
 
             document.getElementById("statsGrid").innerHTML = [
                 SyntraApp.statCard("All leads", String(allLeads.length), "Current pipeline volume"),
                 SyntraApp.statCard("New", String(newLeads), "Need first contact"),
-                SyntraApp.statCard("In progress", String(contacted), "Already in conversation"),
-                SyntraApp.statCard("Conversion rate", conversionRate, `${closed} closed leads`)
+                SyntraApp.statCard("Contacted", String(contacted), "Already in conversation"),
+                SyntraApp.statCard("Enrollment rate", conversionRate, `${enrolled} enrolled leads`)
             ].join("");
         }
 
@@ -164,7 +179,8 @@
             return allLeads.filter((lead) => {
                 const haystack = `${lead.name || ""} ${lead.phone || ""} ${lead.source || ""}`.toLowerCase();
                 const matchesSearch = haystack.includes(term);
-                const matchesStatus = status === "all" ? true : lead.status === status;
+                const normalized = normalizeLeadStatus(lead.status);
+                const matchesStatus = status === "all" ? true : normalized === status;
                 return matchesSearch && matchesStatus;
             });
         }
@@ -195,7 +211,7 @@
                             <tr>
                                 <td class="cell-primary">${SyntraApp.escapeHtml(lead.name || "")}</td>
                                 <td>${SyntraApp.escapeHtml(lead.phone || "")}</td>
-                                <td><span class="badge ${badgeForStatus(lead.status)}">${SyntraApp.escapeHtml(lead.status || "Yangi")}</span></td>
+                                <td><span class="badge ${badgeForStatus(normalizeLeadStatus(lead.status))}">${SyntraApp.escapeHtml(normalizeLeadStatus(lead.status))}</span></td>
                                 <td>${SyntraApp.escapeHtml(lead.source || "Unknown")}</td>
                                 <td>${SyntraApp.escapeHtml(SyntraApp.formatDate(lead.created_at))}</td>
                                 <td>
@@ -213,10 +229,11 @@
         }
 
         function resetLeadForm() {
+            editingLead = null;
             document.getElementById("leadForm").reset();
             document.getElementById("leadId").value = "";
             document.getElementById("leadModalTitle").textContent = "Add lead";
-            document.getElementById("leadStatus").value = "Yangi";
+            document.getElementById("leadStatus").value = "new";
         }
 
         function fillGroupOptions() {
@@ -240,14 +257,14 @@
         }
 
         window.editLead = function editLead(id) {
-            const lead = allLeads.find((item) => item.id === id);
-            if (!lead) return;
+            editingLead = allLeads.find((item) => item.id === id) || null;
+            if (!editingLead) return;
 
-            document.getElementById("leadId").value = lead.id;
-            document.getElementById("leadName").value = lead.name || "";
-            document.getElementById("leadPhone").value = lead.phone || "";
-            document.getElementById("leadStatus").value = lead.status || "Yangi";
-            document.getElementById("leadSource").value = lead.source || "";
+            document.getElementById("leadId").value = editingLead.id;
+            document.getElementById("leadName").value = editingLead.name || "";
+            document.getElementById("leadPhone").value = editingLead.phone || "";
+            document.getElementById("leadStatus").value = editingLead.status || "new";
+            document.getElementById("leadSource").value = editingLead.source || "";
             document.getElementById("leadModalTitle").textContent = "Edit lead";
             SyntraApp.openModal("leadModal");
         };
@@ -277,8 +294,8 @@
             document.getElementById("statsGrid").innerHTML = [
                 SyntraApp.statCard("All leads", "0", "Loading"),
                 SyntraApp.statCard("New", "0", "Loading"),
-                SyntraApp.statCard("In progress", "0", "Loading"),
-                SyntraApp.statCard("Conversion rate", "0%", "Loading")
+                SyntraApp.statCard("Contacted", "0", "Loading"),
+                SyntraApp.statCard("Enrollment rate", "0%", "Loading")
             ].join("");
 
             document.getElementById("newLeadBtn").addEventListener("click", () => {
@@ -309,10 +326,11 @@
                 SyntraApp.setButtonLoading(saveBtn, true, "Saving...");
 
                 const id = document.getElementById("leadId").value;
+                const status = document.getElementById("leadStatus").value;
                 const payload = {
                     name: document.getElementById("leadName").value.trim(),
                     phone: document.getElementById("leadPhone").value.trim(),
-                    status: document.getElementById("leadStatus").value,
+                    status,
                     source: document.getElementById("leadSource").value.trim(),
                     workspace_id: workspaceContext.workspace.id
                 };
@@ -326,6 +344,20 @@
                     SyntraApp.showToast("Save failed", SyntraApp.parseError(error), "error");
                     SyntraApp.setButtonLoading(saveBtn, false);
                     return;
+                }
+
+                if (status === "enrolled" && (!editingLead || editingLead.status !== "enrolled")) {
+                    const convertResponse = await SyntraApp.sb.from("students").insert([{
+                        full_name: payload.name,
+                        phone: payload.phone,
+                        group_id: null,
+                        workspace_id: workspaceContext.workspace.id
+                    }]);
+                    if (convertResponse.error) {
+                        SyntraApp.showToast("Student creation failed", SyntraApp.parseError(convertResponse.error), "error");
+                        SyntraApp.setButtonLoading(saveBtn, false);
+                        return;
+                    }
                 }
 
                 SyntraApp.showToast(id ? "Lead updated" : "Lead added", "Pipeline information is now current.");
@@ -360,7 +392,7 @@
                     return;
                 }
 
-                const { error: updateError } = await SyntraApp.sb.from("leads").update({ status: "Yopildi" }).eq("id", lead.id);
+                const { error: updateError } = await SyntraApp.sb.from("leads").update({ status: "enrolled" }).eq("id", lead.id);
                 if (updateError) {
                     SyntraApp.showToast("Lead status warning", "Student created, but the lead status was not updated.", "error");
                 } else {

@@ -231,6 +231,55 @@ const SyntraApp = (() => {
         URL.revokeObjectURL(link.href);
     }
 
+    async function assignStudentsToGroup(groupId, studentIds, workspaceId) {
+        const existing = await sb
+            .from("group_students")
+            .select("student_id")
+            .eq("group_id", groupId)
+            .eq("workspace_id", workspaceId);
+
+        if (existing.error) {
+            return { error: existing.error };
+        }
+
+        const currentIds = new Set(existing.data.map((item) => item.student_id));
+        const toInsert = studentIds
+            .filter((studentId) => !currentIds.has(studentId))
+            .map((studentId) => ({
+                group_id: groupId,
+                student_id: studentId,
+                workspace_id: workspaceId,
+                status: "active",
+                created_at: new Date().toISOString()
+            }));
+
+        const toDelete = existing.data
+            .filter((item) => !studentIds.includes(item.student_id))
+            .map((item) => item.student_id);
+
+        if (toDelete.length) {
+            const remove = await sb
+                .from("group_students")
+                .delete()
+                .eq("group_id", groupId)
+                .in("student_id", toDelete)
+                .eq("workspace_id", workspaceId);
+
+            if (remove.error) {
+                return { error: remove.error };
+            }
+        }
+
+        if (toInsert.length) {
+            const insert = await sb.from("group_students").insert(toInsert);
+            if (insert.error) {
+                return { error: insert.error };
+            }
+        }
+
+        return { data: true };
+    }
+
     async function requireWorkspace(pageKey) {
         const { data: { session } } = await sb.auth.getSession();
         if (!session) {
@@ -292,6 +341,7 @@ const SyntraApp = (() => {
         emptyState,
         loadingState,
         exportCsv,
+        assignStudentsToGroup,
         requireWorkspace,
         statCard
     };

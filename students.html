@@ -83,11 +83,14 @@
                         <input class="field" id="studentPhone" type="tel" placeholder="+998 90 123 45 67" required>
                     </div>
                     <div class="field-group">
-                        <label class="field-label" for="studentGroupId">Group</label>
-                        <select class="select-field" id="studentGroupId">
-                            <option value="">No group</option>
-                        </select>
+                        <label class="field-label" for="studentGroupSearch">Search group</label>
+                        <input class="field" id="studentGroupSearch" type="search" placeholder="Find group by name">
                     </div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">Assign group</label>
+                    <div id="studentGroupList" class="multi-checkbox-grid">Loading groups...</div>
                 </div>
 
                 <button class="btn btn-primary btn-block" id="saveStudentBtn" type="submit">Save student</button>
@@ -100,6 +103,7 @@
         let workspaceContext;
         let allStudents = [];
         let groups = [];
+        let selectedStudentGroupId = "";
         const params = new URLSearchParams(window.location.search);
         const initialGroupFilter = params.get("group");
 
@@ -117,19 +121,44 @@
         }
 
         function fillGroupOptions() {
-            const selects = [document.getElementById("studentGroupId"), document.getElementById("groupFilter")];
-            selects.forEach((select) => {
-                const defaultOption = select.id === "groupFilter"
-                    ? `<option value="all">All groups</option>`
-                    : `<option value="">No group</option>`;
-                select.innerHTML = defaultOption + groups.map((group) => `
-                    <option value="${group.id}">${SyntraApp.escapeHtml(group.name)}</option>
-                `).join("");
-            });
+            const groupFilter = document.getElementById("groupFilter");
+            groupFilter.innerHTML = `<option value="all">All groups</option>` + groups.map((group) => `
+                <option value="${group.id}">${SyntraApp.escapeHtml(group.name)}</option>
+            `).join("");
 
-            if (initialGroupFilter && document.getElementById("groupFilter")) {
-                document.getElementById("groupFilter").value = initialGroupFilter;
+            if (initialGroupFilter && groupFilter) {
+                groupFilter.value = initialGroupFilter;
             }
+        }
+
+        function renderStudentGroupChooser() {
+            const list = document.getElementById("studentGroupList");
+            const searchTerm = document.getElementById("studentGroupSearch").value.trim().toLowerCase();
+            const filteredGroups = groups.filter((group) => group.name.toLowerCase().includes(searchTerm));
+
+            if (!filteredGroups.length) {
+                list.innerHTML = `<div class="empty-state"><h3>No groups match</h3><p>Try another group name or add a group first.</p></div>`;
+                return;
+            }
+
+            list.innerHTML = filteredGroups.map((group) => {
+                const isSelected = selectedStudentGroupId === group.id ? " checked" : "";
+                return `
+                    <label class="checkbox-card radio-style">
+                        <input type="radio" name="studentGroup" value="${group.id}" ${isSelected}>
+                        <div>
+                            <div class="list-title">${SyntraApp.escapeHtml(group.name)}</div>
+                            <div class="list-meta">${SyntraApp.escapeHtml(group.schedule || "No schedule")}</div>
+                        </div>
+                    </label>
+                `;
+            }).join("");
+
+            document.querySelectorAll("#studentGroupList input[name='studentGroup']").forEach((input) => {
+                input.addEventListener("change", () => {
+                    selectedStudentGroupId = input.value;
+                });
+            });
         }
 
         function currentFilteredStudents() {
@@ -187,21 +216,22 @@
         function resetForm() {
             document.getElementById("studentForm").reset();
             document.getElementById("studentId").value = "";
+            document.getElementById("studentGroupSearch").value = "";
+            selectedStudentGroupId = initialGroupFilter || "";
             document.getElementById("modalTitle").textContent = "Add student";
-            if (initialGroupFilter) {
-                document.getElementById("studentGroupId").value = initialGroupFilter;
-            }
+            renderStudentGroupChooser();
         }
 
         async function refreshData() {
             const [studentsRes, groupsRes] = await Promise.all([
                 SyntraApp.sb.from("students").select("*, groups(name)").eq("workspace_id", workspaceContext.workspace.id).order("created_at", { ascending: false }),
-                SyntraApp.sb.from("groups").select("id, name").eq("workspace_id", workspaceContext.workspace.id).order("name", { ascending: true })
+                SyntraApp.sb.from("groups").select("id, name, schedule").eq("workspace_id", workspaceContext.workspace.id).order("name", { ascending: true })
             ]);
 
             allStudents = studentsRes.data || [];
             groups = groupsRes.data || [];
             fillGroupOptions();
+            renderStudentGroupChooser();
             renderStats();
             renderTable();
         }
@@ -213,8 +243,10 @@
             document.getElementById("studentId").value = student.id;
             document.getElementById("studentName").value = student.full_name || "";
             document.getElementById("studentPhone").value = student.phone || "";
-            document.getElementById("studentGroupId").value = student.group_id || "";
+            selectedStudentGroupId = student.group_id || "";
+            document.getElementById("studentGroupSearch").value = "";
             document.getElementById("modalTitle").textContent = "Edit student";
+            renderStudentGroupChooser();
             SyntraApp.openModal("studentModal");
         };
 
@@ -248,6 +280,7 @@
 
             document.getElementById("searchInput").addEventListener("input", renderTable);
             document.getElementById("groupFilter").addEventListener("change", renderTable);
+            document.getElementById("studentGroupSearch").addEventListener("input", renderStudentGroupChooser);
 
             document.getElementById("exportBtn").addEventListener("click", () => {
                 SyntraApp.exportCsv(
@@ -271,7 +304,7 @@
                 const payload = {
                     name: document.getElementById("studentName").value.trim(),
                     phone: document.getElementById("studentPhone").value.trim(),
-                    group_id: document.getElementById("studentGroupId").value || null,
+                    group_id: selectedStudentGroupId || null,
                     workspace_id: workspaceContext.workspace.id
                 };
 

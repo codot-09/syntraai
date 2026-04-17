@@ -79,6 +79,16 @@
                     </div>
                 </div>
 
+                <div class="field-group">
+                    <label class="field-label" for="groupStudentSearch">Search students</label>
+                    <input class="field" id="groupStudentSearch" type="search" placeholder="Find students by name or phone">
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">Assign students</label>
+                    <div id="groupStudentsList" class="multi-checkbox-grid">Loading students...</div>
+                </div>
+
                 <button class="btn btn-primary btn-block" id="saveGroupBtn" type="submit">Save group</button>
             </form>
         </div>
@@ -89,12 +99,14 @@
         let workspaceContext;
         let allGroups = [];
         let students = [];
+        let groupAssignments = [];
+        let groupSelection = new Set();
 
         function renderStats() {
             const totalGroups = allGroups.length;
-            const totalStudents = students.length;
+            const assignedStudents = new Set(groupAssignments.map((assignment) => assignment.student_id)).size;
             const potentialRevenue = allGroups.reduce((sum, group) => {
-                const studentCount = students.filter((student) => student.group_id === group.id).length;
+                const studentCount = groupAssignments.filter((assignment) => assignment.group_id === group.id).length;
                 return sum + (Number(group.price || 0) * studentCount);
             }, 0);
             const averagePrice = totalGroups
@@ -103,7 +115,7 @@
 
             document.getElementById("statsGrid").innerHTML = [
                 SyntraApp.statCard("Total groups", String(totalGroups), totalGroups ? "Active learning tracks configured" : "Create your first group"),
-                SyntraApp.statCard("Assigned students", String(totalStudents), `${totalGroups ? Math.round(totalStudents / totalGroups || 0) : 0} avg per group`),
+                SyntraApp.statCard("Assigned students", String(assignedStudents), `${totalGroups ? Math.round(assignedStudents / totalGroups || 0) : 0} avg per group`),
                 SyntraApp.statCard("Average price", SyntraApp.formatMoney(averagePrice), "Useful for pricing consistency"),
                 SyntraApp.statCard("Potential revenue", SyntraApp.formatMoney(potentialRevenue), "Based on current student assignments")
             ].join("");
@@ -123,7 +135,7 @@
             }
 
             groupsGrid.innerHTML = filtered.map((group) => {
-                const studentCount = students.filter((student) => student.group_id === group.id).length;
+                const studentCount = groupAssignments.filter((assignment) => assignment.group_id === group.id).length;
                 return `
                     <article class="panel">
                         <div class="panel-header">
@@ -160,21 +172,70 @@
         }
 
         async function refreshData() {
-            const [groupsRes, studentsRes] = await Promise.all([
+            const [groupsRes, studentsRes, assignmentsRes] = await Promise.all([
                 SyntraApp.sb.from("groups").select("*").eq("workspace_id", workspaceContext.workspace.id).order("created_at", { ascending: false }),
-                SyntraApp.sb.from("students").select("*").eq("workspace_id", workspaceContext.workspace.id)
+                SyntraApp.sb.from("students").select("*").eq("workspace_id", workspaceContext.workspace.id).order("name", { ascending: true }),
+                SyntraApp.sb.from("group_students").select("*").eq("workspace_id", workspaceContext.workspace.id)
             ]);
 
             allGroups = groupsRes.data || [];
             students = studentsRes.data || [];
+            groupAssignments = assignmentsRes.data || [];
             renderStats();
             renderGroups();
+            renderStudentSelection();
         }
 
         function resetForm() {
             document.getElementById("groupForm").reset();
             document.getElementById("groupId").value = "";
+            document.getElementById("groupStudentSearch").value = "";
             document.getElementById("modalTitle").textContent = "Create group";
+            groupSelection = new Set();
+            renderStudentSelection();
+        }
+
+        function getAssignedStudentIds(groupId) {
+            return groupAssignments
+                .filter((assignment) => assignment.group_id === groupId)
+                .map((assignment) => assignment.student_id);
+        }
+
+        function renderStudentSelection() {
+            const list = document.getElementById("groupStudentsList");
+            const searchTerm = document.getElementById("groupStudentSearch").value.trim().toLowerCase();
+            const availableStudents = students.filter((student) => {
+                const haystack = `${student.name || ""} ${student.phone || ""}`.toLowerCase();
+                return haystack.includes(searchTerm);
+            });
+
+            if (!availableStudents.length) {
+                list.innerHTML = `<div class="empty-state"><h3>No students match</h3><p>Try a different name or phone number.</p></div>`;
+                return;
+            }
+
+            list.innerHTML = availableStudents.map((student) => {
+                const checked = groupSelection.has(student.id) ? "checked" : "";
+                return `
+                    <label class="checkbox-card">
+                        <input type="checkbox" value="${SyntraApp.escapeHtml(student.id)}" ${checked}>
+                        <div>
+                            <div class="list-title">${SyntraApp.escapeHtml(student.name)}</div>
+                            <div class="list-meta">${SyntraApp.escapeHtml(student.phone)}</div>
+                        </div>
+                    </label>
+                `;
+            }).join("");
+
+            document.querySelectorAll("#groupStudentsList input[type='checkbox']").forEach((input) => {
+                input.addEventListener("change", () => {
+                    if (input.checked) {
+                        groupSelection.add(input.value);
+                    } else {
+                        groupSelection.delete(input.value);
+                    }
+                });
+            });
         }
 
         window.editGroup = function editGroup(id) {
@@ -185,12 +246,15 @@
             document.getElementById("groupName").value = group.name || "";
             document.getElementById("groupPrice").value = group.price || "";
             document.getElementById("groupSchedule").value = group.schedule || "";
+            document.getElementById("groupStudentSearch").value = "";
             document.getElementById("modalTitle").textContent = "Edit group";
+            groupSelection = new Set(getAssignedStudentIds(group.id));
+            renderStudentSelection();
             SyntraApp.openModal("groupModal");
         };
 
         window.deleteGroup = async function deleteGroup(id) {
-            const hasStudents = students.some((student) => student.group_id === id);
+            const hasStudents = groupAssignments.some((assignment) => assignment.group_id === id);
             if (hasStudents) {
                 SyntraApp.showToast("Cannot delete group", "Move or remove assigned students first.", "error");
                 return;
@@ -198,6 +262,7 @@
 
             if (!window.confirm("Delete this group?")) return;
 
+            await SyntraApp.sb.from("group_students").delete().eq("group_id", id).eq("workspace_id", workspaceContext.workspace.id);
             const { error } = await SyntraApp.sb.from("groups").delete().eq("id", id);
             if (error) {
                 SyntraApp.showToast("Delete failed", SyntraApp.parseError(error), "error");
@@ -232,12 +297,13 @@
                         group.name,
                         group.schedule || "",
                         group.price || 0,
-                        students.filter((student) => student.group_id === group.id).length
+                        groupAssignments.filter((assignment) => assignment.group_id === group.id).length
                     ])
                 );
             });
 
             document.getElementById("searchInput").addEventListener("input", renderGroups);
+            document.getElementById("groupStudentSearch").addEventListener("input", renderStudentSelection);
 
             document.getElementById("groupForm").addEventListener("submit", async (event) => {
                 event.preventDefault();
@@ -252,15 +318,29 @@
                     workspace_id: workspaceContext.workspace.id
                 };
 
-                const query = id
-                    ? SyntraApp.sb.from("groups").update(payload).eq("id", id)
-                    : SyntraApp.sb.from("groups").insert([payload]);
-                const { error } = await query;
+                let query;
+                if (id) {
+                    query = SyntraApp.sb.from("groups").update(payload).eq("id", id);
+                } else {
+                    query = SyntraApp.sb.from("groups").insert([payload]).select("id");
+                }
 
-                if (error) {
-                    SyntraApp.showToast("Save failed", SyntraApp.parseError(error), "error");
+                const result = await query;
+                if (result.error) {
+                    SyntraApp.showToast("Save failed", SyntraApp.parseError(result.error), "error");
                     SyntraApp.setButtonLoading(saveBtn, false);
                     return;
+                }
+
+                const createdGroupId = id || (result.data && result.data[0]?.id);
+                if (createdGroupId) {
+                    const selectedIds = [...groupSelection];
+                    const assignment = await SyntraApp.assignStudentsToGroup(createdGroupId, selectedIds, workspaceContext.workspace.id);
+                    if (assignment.error) {
+                        SyntraApp.showToast("Assignment failed", SyntraApp.parseError(assignment.error), "error");
+                        SyntraApp.setButtonLoading(saveBtn, false);
+                        return;
+                    }
                 }
 
                 SyntraApp.showToast(id ? "Group updated" : "Group created", "Your group data is now up to date.");

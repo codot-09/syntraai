@@ -649,6 +649,38 @@ tbody tr:hover {
     font-weight: 800;
 }
 
+.multi-checkbox-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.checkbox-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    border-radius: 18px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.96);
+    cursor: pointer;
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.checkbox-card:hover {
+    border-color: rgba(15, 98, 254, 0.2);
+    box-shadow: 0 10px 24px rgba(15, 98, 254, 0.08);
+}
+
+.checkbox-card input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+}
+
+.checkbox-card.radio-style input {
+    border-radius: 50%;
+}
+
 .helper-text {
     color: var(--text-faint);
     font-size: 0.82rem;
