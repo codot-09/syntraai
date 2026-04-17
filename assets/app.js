@@ -306,6 +306,12 @@ const SyntraApp = (() => {
             return null;
         }
 
+        const subscribed = Boolean(workspace.subscribed);
+        if (!subscribed && pageKey !== "subscription") {
+            window.location.href = "subscription.html";
+            return null;
+        }
+
         renderSidebar({ pageKey, workspace, user });
         setTopbarMeta({ workspace });
         wireMobileMenu();
