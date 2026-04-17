@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyntraAI | Workspaces</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+    <div class="app-grid"></div>
+    <div class="app-aurora"></div>
+
+    <div class="auth-shell">
+        <div class="auth-card">
+            <section class="marketing-panel">
+                <div class="eyebrow">Workspace control</div>
+                <h1 class="hero-title">Create a clean operating layer for your academy.</h1>
+                <p class="hero-description">
+                    Set up your organization once, then manage enrollments, operations, and payments from a structured workspace.
+                </p>
+
+                <div class="panel" style="margin-top: 26px;">
+                    <div class="panel-header">
+                        <div>
+                            <div class="panel-title">Your existing workspaces</div>
+                            <div class="panel-subtitle">Quickly jump back into a live environment.</div>
+                        </div>
+                    </div>
+                    <div id="workspaceList" class="workspace-grid">
+                        <div class="loading-state">
+                            <h3>Loading workspaces</h3>
+                            <p>Please wait while we prepare your environments.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="auth-panel">
+                <div class="brand" style="margin-bottom: 24px;">
+                    <img class="brand-logo" src="assets/syntraavatar.png" alt="SyntraAI">
+                    <div class="brand-mark">
+                        <div class="brand-name">New Workspace</div>
+                        <div class="brand-subtitle">Professional onboarding with structure from the start</div>
+                    </div>
+                </div>
+
+                <form id="workspaceForm" class="form-grid">
+                    <div class="field-group">
+                        <label class="field-label" for="name">Workspace name</label>
+                        <input class="field" id="name" type="text" placeholder="Syntra Education Hub" required autofocus>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label" for="slug">Workspace slug</label>
+                        <input class="field" id="slug" type="text" placeholder="syntra-hub" required>
+                        <div class="helper-text">This is used in your workspace URL and should stay simple and unique.</div>
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label" for="phone">Primary phone</label>
+                        <input class="field" id="phone" type="tel" placeholder="+998 90 123 45 67" required>
+                    </div>
+
+                    <button class="btn btn-primary btn-block" id="submitBtn" type="submit">Create workspace</button>
+                </form>
+            </section>
+        </div>
+    </div>
+
+    <script src="assets/app.js"></script>
+    <script>
+        const form = document.getElementById("workspaceForm");
+        const nameInput = document.getElementById("name");
+        const slugInput = document.getElementById("slug");
+        const submitBtn = document.getElementById("submitBtn");
+        const workspaceList = document.getElementById("workspaceList");
+        let currentUser = null;
+
+        function slugify(value) {
+            return value
+                .toLowerCase()
+                .trim()
+                .replace(/[^\w\s-]/g, "")
+                .replace(/[\s_-]+/g, "-")
+                .replace(/^-+|-+$/g, "");
+        }
+
+        nameInput.addEventListener("input", () => {
+            if (!slugInput.dataset.edited) {
+                slugInput.value = slugify(nameInput.value);
+            }
+        });
+
+        slugInput.addEventListener("input", () => {
+            slugInput.dataset.edited = "true";
+            slugInput.value = slugify(slugInput.value);
+        });
+
+        async function loadWorkspaces() {
+            const { data, error } = await SyntraApp.sb
+                .from("workspaces")
+                .select("*")
+                .eq("owner_id", currentUser.id)
+                .order("created_at", { ascending: false });
+
+            if (error) {
+                workspaceList.innerHTML = SyntraApp.emptyState("Could not load workspaces", SyntraApp.parseError(error));
+                return;
+            }
+
+            if (!data?.length) {
+                workspaceList.innerHTML = SyntraApp.emptyState("No workspaces yet", "Create your first workspace to start managing operations.");
+                return;
+            }
+
+            workspaceList.innerHTML = data.map((workspace) => `
+                <article class="workspace-card">
+                    <h3>${SyntraApp.escapeHtml(workspace.name)}</h3>
+                    <p>${SyntraApp.escapeHtml(workspace.slug)} • ${SyntraApp.escapeHtml(workspace.phone || "No phone")}</p>
+                    <a class="btn btn-secondary btn-block" href="${SyntraApp.withWorkspace("dashboard.html", workspace.slug)}">Open workspace</a>
+                </article>
+            `).join("");
+        }
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            SyntraApp.setButtonLoading(submitBtn, true, "Creating...");
+
+            const payload = {
+                name: nameInput.value.trim(),
+                slug: slugify(slugInput.value),
+                phone: document.getElementById("phone").value.trim(),
+                owner_id: currentUser.id
+            };
+
+            const { error } = await SyntraApp.sb.from("workspaces").insert([payload]);
+            if (error) {
+                SyntraApp.showToast("Workspace creation failed", SyntraApp.parseError(error), "error");
+                SyntraApp.setButtonLoading(submitBtn, false);
+                return;
+            }
+
+            SyntraApp.showToast("Workspace created", "Redirecting to your dashboard.");
+            window.location.href = SyntraApp.withWorkspace("dashboard.html", payload.slug);
+        });
+
+        window.addEventListener("load", async () => {
+            const { data: { user } } = await SyntraApp.sb.auth.getUser();
+            if (!user) {
+                window.location.href = "index.html";
+                return;
+            }
+
+            currentUser = user;
+            loadWorkspaces();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyntraAI | Payments</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+    <div class="app-grid"></div>
+    <div class="app-aurora"></div>
+
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar"></aside>
+
+        <div class="content">
+            <div class="mobile-topbar">
+                <button class="btn btn-secondary" id="openSidebar" type="button">Menu</button>
+                <div class="workspace-pill" id="workspaceBadge">Workspace</div>
+            </div>
+
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h1>Payments</h1>
+                    <p>Track transaction history, monitor revenue quality, and keep finance operations structured.</p>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-secondary" id="exportBtn" type="button">Export CSV</button>
+                    <button class="btn btn-primary" id="newPaymentBtn" type="button">Record payment</button>
+                </div>
+            </header>
+
+            <div class="page-stack">
+                <section class="stats-grid" id="statsGrid"></section>
+
+                <section class="panel">
+                    <div class="controls">
+                        <div class="search-wrap">
+                            <input class="search-field" id="searchInput" type="text" placeholder="Search by student name">
+                        </div>
+                        <select class="select-field" id="studentFilter" style="max-width: 260px;">
+                            <option value="all">All students</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <div class="panel-title">Payment ledger</div>
+                            <div class="panel-subtitle">Recent payment activity across enrolled students.</div>
+                        </div>
+                    </div>
+                    <div class="table-wrap" id="paymentsTableWrap"></div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="paymentModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title" id="paymentModalTitle">Record payment</div>
+                    <div class="modal-subtitle">Attach a payment to a student and keep the finance trail up to date.</div>
+                </div>
+                <button class="btn btn-ghost" data-close-modal="paymentModal" type="button">Close</button>
+            </div>
+
+            <form id="paymentForm" class="form-grid">
+                <input id="paymentId" type="hidden">
+
+                <div class="field-group">
+                    <label class="field-label" for="studentSelect">Student</label>
+                    <select class="select-field" id="studentSelect" required>
+                        <option value="">Select student</option>
+                    </select>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="paymentAmount">Amount</label>
+                    <input class="field" id="paymentAmount" type="number" min="0" placeholder="500000" required>
+                </div>
+
+                <button class="btn btn-primary btn-block" id="savePaymentBtn" type="submit">Save payment</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="assets/app.js"></script>
+    <script>
+        let workspaceContext;
+        let payments = [];
+        let students = [];
+
+        function monthStart() {
+            const now = new Date();
+            return new Date(now.getFullYear(), now.getMonth(), 1);
+        }
+
+        function fillStudentOptions() {
+            const options = students.map((student) => `
+                <option value="${student.id}">${SyntraApp.escapeHtml(student.full_name)}</option>
+            `).join("");
+            document.getElementById("studentSelect").innerHTML = `<option value="">Select student</option>${options}`;
+            document.getElementById("studentFilter").innerHTML = `<option value="all">All students</option>${options}`;
+        }
+
+        function renderStats() {
+            const totalRevenue = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+            const monthlyRevenue = payments
+                .filter((payment) => payment.created_at && new Date(payment.created_at) >= monthStart())
+                .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+            const avgPayment = payments.length ? Math.round(totalRevenue / payments.length) : 0;
+
+            document.getElementById("statsGrid").innerHTML = [
+                SyntraApp.statCard("Total revenue", SyntraApp.formatMoney(totalRevenue), `${payments.length} recorded transactions`),
+                SyntraApp.statCard("Revenue this month", SyntraApp.formatMoney(monthlyRevenue), "Current calendar month"),
+                SyntraApp.statCard("Average payment", SyntraApp.formatMoney(avgPayment), "Mean transaction value"),
+                SyntraApp.statCard("Paid students", String(new Set(payments.map((payment) => payment.student_id).filter(Boolean)).size), `${students.length} students in directory`)
+            ].join("");
+        }
+
+        function filteredPayments() {
+            const term = document.getElementById("searchInput").value.trim().toLowerCase();
+            const studentFilter = document.getElementById("studentFilter").value;
+
+            return payments.filter((payment) => {
+                const studentName = payment.students?.full_name || "";
+                const matchesSearch = studentName.toLowerCase().includes(term);
+                const matchesStudent = studentFilter === "all" ? true : payment.student_id === studentFilter;
+                return matchesSearch && matchesStudent;
+            });
+        }
+
+        function renderPayments() {
+            const container = document.getElementById("paymentsTableWrap");
+            const rows = filteredPayments();
+
+            if (!rows.length) {
+                container.innerHTML = SyntraApp.emptyState("No payments found", "Record your first payment or adjust the current filters.");
+                return;
+            }
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Amount</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map((payment) => `
+                            <tr>
+                                <td class="cell-primary">${SyntraApp.escapeHtml(payment.students?.full_name || "Unknown student")}</td>
+                                <td class="value-positive">${SyntraApp.escapeHtml(SyntraApp.formatMoney(payment.amount || 0))}</td>
+                                <td>${SyntraApp.escapeHtml(SyntraApp.formatDate(payment.created_at))}</td>
+                                <td>
+                                    <div class="table-actions">
+                                        <button class="btn btn-secondary" type="button" onclick="editPayment('${payment.id}')">Edit</button>
+                                        <button class="btn btn-danger" type="button" onclick="deletePayment('${payment.id}')">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function resetForm() {
+            document.getElementById("paymentForm").reset();
+            document.getElementById("paymentId").value = "";
+            document.getElementById("paymentModalTitle").textContent = "Record payment";
+        }
+
+        async function refreshData() {
+            const [paymentsRes, studentsRes] = await Promise.all([
+                SyntraApp.sb.from("payments").select("*, students(full_name)").eq("workspace_id", workspaceContext.workspace.id).order("created_at", { ascending: false }),
+                SyntraApp.sb.from("students").select("id, full_name").eq("workspace_id", workspaceContext.workspace.id).order("full_name", { ascending: true })
+            ]);
+
+            payments = paymentsRes.data || [];
+            students = studentsRes.data || [];
+            fillStudentOptions();
+            renderStats();
+            renderPayments();
+        }
+
+        window.editPayment = function editPayment(id) {
+            const payment = payments.find((item) => item.id === id);
+            if (!payment) return;
+
+            document.getElementById("paymentId").value = payment.id;
+            document.getElementById("studentSelect").value = payment.student_id || "";
+            document.getElementById("paymentAmount").value = payment.amount || "";
+            document.getElementById("paymentModalTitle").textContent = "Edit payment";
+            SyntraApp.openModal("paymentModal");
+        };
+
+        window.deletePayment = async function deletePayment(id) {
+            if (!window.confirm("Delete this payment?")) return;
+            const { error } = await SyntraApp.sb.from("payments").delete().eq("id", id);
+            if (error) {
+                SyntraApp.showToast("Delete failed", SyntraApp.parseError(error), "error");
+                return;
+            }
+
+            SyntraApp.showToast("Payment deleted", "The transaction has been removed.");
+            refreshData();
+        };
+
+        window.addEventListener("load", async () => {
+            workspaceContext = await SyntraApp.requireWorkspace("payment");
+            if (!workspaceContext) return;
+
+            document.getElementById("statsGrid").innerHTML = [
+                SyntraApp.statCard("Total revenue", "0 so'm", "Loading"),
+                SyntraApp.statCard("Revenue this month", "0 so'm", "Loading"),
+                SyntraApp.statCard("Average payment", "0 so'm", "Loading"),
+                SyntraApp.statCard("Paid students", "0", "Loading")
+            ].join("");
+
+            document.getElementById("newPaymentBtn").addEventListener("click", () => {
+                resetForm();
+                SyntraApp.openModal("paymentModal");
+            });
+
+            document.getElementById("searchInput").addEventListener("input", renderPayments);
+            document.getElementById("studentFilter").addEventListener("change", renderPayments);
+
+            document.getElementById("exportBtn").addEventListener("click", () => {
+                SyntraApp.exportCsv(
+                    "payments.csv",
+                    ["Student", "Amount", "Date"],
+                    filteredPayments().map((payment) => [
+                        payment.students?.full_name || "",
+                        payment.amount || 0,
+                        SyntraApp.formatDate(payment.created_at)
+                    ])
+                );
+            });
+
+            document.getElementById("paymentForm").addEventListener("submit", async (event) => {
+                event.preventDefault();
+                const saveBtn = document.getElementById("savePaymentBtn");
+                SyntraApp.setButtonLoading(saveBtn, true, "Saving...");
+
+                const id = document.getElementById("paymentId").value;
+                const payload = {
+                    student_id: document.getElementById("studentSelect").value,
+                    amount: Number(document.getElementById("paymentAmount").value),
+                    workspace_id: workspaceContext.workspace.id
+                };
+
+                const query = id
+                    ? SyntraApp.sb.from("payments").update(payload).eq("id", id)
+                    : SyntraApp.sb.from("payments").insert([payload]);
+                const { error } = await query;
+
+                if (error) {
+                    SyntraApp.showToast("Save failed", SyntraApp.parseError(error), "error");
+                    SyntraApp.setButtonLoading(saveBtn, false);
+                    return;
+                }
+
+                SyntraApp.showToast(id ? "Payment updated" : "Payment recorded", "Finance data has been saved.");
+                SyntraApp.closeModal("paymentModal");
+                SyntraApp.setButtonLoading(saveBtn, false);
+                refreshData();
+            });
+
+            refreshData();
+        });
+    </script>
+</body>
+</html>

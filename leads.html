@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyntraAI | Leads</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+    <div class="app-grid"></div>
+    <div class="app-aurora"></div>
+
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar"></aside>
+
+        <div class="content">
+            <div class="mobile-topbar">
+                <button class="btn btn-secondary" id="openSidebar" type="button">Menu</button>
+                <div class="workspace-pill" id="workspaceBadge">Workspace</div>
+            </div>
+
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h1>Leads</h1>
+                    <p>Manage acquisition, track status progression, and convert promising leads into enrolled students.</p>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-secondary" id="exportBtn" type="button">Export CSV</button>
+                    <button class="btn btn-primary" id="newLeadBtn" type="button">New lead</button>
+                </div>
+            </header>
+
+            <div class="page-stack">
+                <section class="stats-grid" id="statsGrid"></section>
+
+                <section class="panel">
+                    <div class="controls">
+                        <div class="search-wrap">
+                            <input class="search-field" id="searchInput" type="text" placeholder="Search by name, phone, or source">
+                        </div>
+                        <select class="select-field" id="statusFilter" style="max-width: 220px;">
+                            <option value="all">All statuses</option>
+                            <option value="Yangi">Yangi</option>
+                            <option value="Suhbatda">Suhbatda</option>
+                            <option value="Yopildi">Yopildi</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <div class="panel-title">Pipeline table</div>
+                            <div class="panel-subtitle">Track contact status and move qualified leads toward enrollment.</div>
+                        </div>
+                    </div>
+                    <div class="table-wrap" id="leadsTableWrap"></div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="leadModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title" id="leadModalTitle">Add lead</div>
+                    <div class="modal-subtitle">Capture the lead source and the current pipeline stage.</div>
+                </div>
+                <button class="btn btn-ghost" data-close-modal="leadModal" type="button">Close</button>
+            </div>
+
+            <form id="leadForm" class="form-grid">
+                <input id="leadId" type="hidden">
+
+                <div class="field-group">
+                    <label class="field-label" for="leadName">Full name</label>
+                    <input class="field" id="leadName" type="text" placeholder="Ali Valiyev" required>
+                </div>
+
+                <div class="form-grid two">
+                    <div class="field-group">
+                        <label class="field-label" for="leadPhone">Phone</label>
+                        <input class="field" id="leadPhone" type="tel" placeholder="+998 90 123 45 67" required>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label" for="leadStatus">Status</label>
+                        <select class="select-field" id="leadStatus">
+                            <option value="Yangi">Yangi</option>
+                            <option value="Suhbatda">Suhbatda</option>
+                            <option value="Yopildi">Yopildi</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="leadSource">Source</label>
+                    <input class="field" id="leadSource" type="text" placeholder="Instagram, Telegram, Referral">
+                </div>
+
+                <button class="btn btn-primary btn-block" id="saveLeadBtn" type="submit">Save lead</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="convertModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">Convert lead to student</div>
+                    <div class="modal-subtitle">This creates a student record and marks the lead as closed.</div>
+                </div>
+                <button class="btn btn-ghost" data-close-modal="convertModal" type="button">Close</button>
+            </div>
+
+            <form id="convertForm" class="form-grid">
+                <input id="convertLeadId" type="hidden">
+                <div class="field-group">
+                    <label class="field-label" for="convertGroupId">Assign group</label>
+                    <select class="select-field" id="convertGroupId">
+                        <option value="">No group yet</option>
+                    </select>
+                </div>
+
+                <button class="btn btn-primary btn-block" id="convertBtn" type="submit">Convert lead</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="assets/app.js"></script>
+    <script>
+        let workspaceContext;
+        let allLeads = [];
+        let groups = [];
+
+        function badgeForStatus(status) {
+            if (status === "Yopildi") return "badge-success";
+            if (status === "Suhbatda") return "badge-warning";
+            return "badge-primary";
+        }
+
+        function renderStats() {
+            const newLeads = allLeads.filter((lead) => lead.status === "Yangi").length;
+            const contacted = allLeads.filter((lead) => lead.status === "Suhbatda").length;
+            const closed = allLeads.filter((lead) => lead.status === "Yopildi").length;
+            const conversionRate = allLeads.length ? `${Math.round((closed / allLeads.length) * 100)}%` : "0%";
+
+            document.getElementById("statsGrid").innerHTML = [
+                SyntraApp.statCard("All leads", String(allLeads.length), "Current pipeline volume"),
+                SyntraApp.statCard("New", String(newLeads), "Need first contact"),
+                SyntraApp.statCard("In progress", String(contacted), "Already in conversation"),
+                SyntraApp.statCard("Conversion rate", conversionRate, `${closed} closed leads`)
+            ].join("");
+        }
+
+        function filteredLeads() {
+            const term = document.getElementById("searchInput").value.trim().toLowerCase();
+            const status = document.getElementById("statusFilter").value;
+
+            return allLeads.filter((lead) => {
+                const haystack = `${lead.name || ""} ${lead.phone || ""} ${lead.source || ""}`.toLowerCase();
+                const matchesSearch = haystack.includes(term);
+                const matchesStatus = status === "all" ? true : lead.status === status;
+                return matchesSearch && matchesStatus;
+            });
+        }
+
+        function renderLeads() {
+            const container = document.getElementById("leadsTableWrap");
+            const leads = filteredLeads();
+
+            if (!leads.length) {
+                container.innerHTML = SyntraApp.emptyState("No leads found", "Try another filter or create a new lead.");
+                return;
+            }
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Status</th>
+                            <th>Source</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${leads.map((lead) => `
+                            <tr>
+                                <td class="cell-primary">${SyntraApp.escapeHtml(lead.name || "")}</td>
+                                <td>${SyntraApp.escapeHtml(lead.phone || "")}</td>
+                                <td><span class="badge ${badgeForStatus(lead.status)}">${SyntraApp.escapeHtml(lead.status || "Yangi")}</span></td>
+                                <td>${SyntraApp.escapeHtml(lead.source || "Unknown")}</td>
+                                <td>${SyntraApp.escapeHtml(SyntraApp.formatDate(lead.created_at))}</td>
+                                <td>
+                                    <div class="table-actions">
+                                        <button class="btn btn-secondary" type="button" onclick="editLead('${lead.id}')">Edit</button>
+                                        <button class="btn btn-secondary" type="button" onclick="openConvert('${lead.id}')">Convert</button>
+                                        <button class="btn btn-danger" type="button" onclick="deleteLead('${lead.id}')">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function resetLeadForm() {
+            document.getElementById("leadForm").reset();
+            document.getElementById("leadId").value = "";
+            document.getElementById("leadModalTitle").textContent = "Add lead";
+            document.getElementById("leadStatus").value = "Yangi";
+        }
+
+        function fillGroupOptions() {
+            document.getElementById("convertGroupId").innerHTML = `
+                <option value="">No group yet</option>
+                ${groups.map((group) => `<option value="${group.id}">${SyntraApp.escapeHtml(group.name)}</option>`).join("")}
+            `;
+        }
+
+        async function refreshData() {
+            const [leadsRes, groupsRes] = await Promise.all([
+                SyntraApp.sb.from("leads").select("*").eq("workspace_id", workspaceContext.workspace.id).order("created_at", { ascending: false }),
+                SyntraApp.sb.from("groups").select("id, name").eq("workspace_id", workspaceContext.workspace.id).order("name", { ascending: true })
+            ]);
+
+            allLeads = leadsRes.data || [];
+            groups = groupsRes.data || [];
+            fillGroupOptions();
+            renderStats();
+            renderLeads();
+        }
+
+        window.editLead = function editLead(id) {
+            const lead = allLeads.find((item) => item.id === id);
+            if (!lead) return;
+
+            document.getElementById("leadId").value = lead.id;
+            document.getElementById("leadName").value = lead.name || "";
+            document.getElementById("leadPhone").value = lead.phone || "";
+            document.getElementById("leadStatus").value = lead.status || "Yangi";
+            document.getElementById("leadSource").value = lead.source || "";
+            document.getElementById("leadModalTitle").textContent = "Edit lead";
+            SyntraApp.openModal("leadModal");
+        };
+
+        window.openConvert = function openConvert(id) {
+            document.getElementById("convertLeadId").value = id;
+            document.getElementById("convertGroupId").value = "";
+            SyntraApp.openModal("convertModal");
+        };
+
+        window.deleteLead = async function deleteLead(id) {
+            if (!window.confirm("Delete this lead?")) return;
+            const { error } = await SyntraApp.sb.from("leads").delete().eq("id", id);
+            if (error) {
+                SyntraApp.showToast("Delete failed", SyntraApp.parseError(error), "error");
+                return;
+            }
+
+            SyntraApp.showToast("Lead deleted", "The lead was removed from the pipeline.");
+            refreshData();
+        };
+
+        window.addEventListener("load", async () => {
+            workspaceContext = await SyntraApp.requireWorkspace("leads");
+            if (!workspaceContext) return;
+
+            document.getElementById("statsGrid").innerHTML = [
+                SyntraApp.statCard("All leads", "0", "Loading"),
+                SyntraApp.statCard("New", "0", "Loading"),
+                SyntraApp.statCard("In progress", "0", "Loading"),
+                SyntraApp.statCard("Conversion rate", "0%", "Loading")
+            ].join("");
+
+            document.getElementById("newLeadBtn").addEventListener("click", () => {
+                resetLeadForm();
+                SyntraApp.openModal("leadModal");
+            });
+
+            document.getElementById("searchInput").addEventListener("input", renderLeads);
+            document.getElementById("statusFilter").addEventListener("change", renderLeads);
+
+            document.getElementById("exportBtn").addEventListener("click", () => {
+                SyntraApp.exportCsv(
+                    "leads.csv",
+                    ["Name", "Phone", "Status", "Source", "Created"],
+                    filteredLeads().map((lead) => [
+                        lead.name || "",
+                        lead.phone || "",
+                        lead.status || "",
+                        lead.source || "",
+                        SyntraApp.formatDate(lead.created_at)
+                    ])
+                );
+            });
+
+            document.getElementById("leadForm").addEventListener("submit", async (event) => {
+                event.preventDefault();
+                const saveBtn = document.getElementById("saveLeadBtn");
+                SyntraApp.setButtonLoading(saveBtn, true, "Saving...");
+
+                const id = document.getElementById("leadId").value;
+                const payload = {
+                    name: document.getElementById("leadName").value.trim(),
+                    phone: document.getElementById("leadPhone").value.trim(),
+                    status: document.getElementById("leadStatus").value,
+                    source: document.getElementById("leadSource").value.trim(),
+                    workspace_id: workspaceContext.workspace.id
+                };
+
+                const query = id
+                    ? SyntraApp.sb.from("leads").update(payload).eq("id", id)
+                    : SyntraApp.sb.from("leads").insert([payload]);
+                const { error } = await query;
+
+                if (error) {
+                    SyntraApp.showToast("Save failed", SyntraApp.parseError(error), "error");
+                    SyntraApp.setButtonLoading(saveBtn, false);
+                    return;
+                }
+
+                SyntraApp.showToast(id ? "Lead updated" : "Lead added", "Pipeline information is now current.");
+                SyntraApp.closeModal("leadModal");
+                SyntraApp.setButtonLoading(saveBtn, false);
+                refreshData();
+            });
+
+            document.getElementById("convertForm").addEventListener("submit", async (event) => {
+                event.preventDefault();
+                const convertBtn = document.getElementById("convertBtn");
+                SyntraApp.setButtonLoading(convertBtn, true, "Converting...");
+
+                const leadId = document.getElementById("convertLeadId").value;
+                const lead = allLeads.find((item) => item.id === leadId);
+                if (!lead) {
+                    SyntraApp.showToast("Lead not found", "Please refresh and try again.", "error");
+                    SyntraApp.setButtonLoading(convertBtn, false);
+                    return;
+                }
+
+                const { error: insertError } = await SyntraApp.sb.from("students").insert([{
+                    full_name: lead.name,
+                    phone: lead.phone,
+                    group_id: document.getElementById("convertGroupId").value || null,
+                    workspace_id: workspaceContext.workspace.id
+                }]);
+
+                if (insertError) {
+                    SyntraApp.showToast("Conversion failed", SyntraApp.parseError(insertError), "error");
+                    SyntraApp.setButtonLoading(convertBtn, false);
+                    return;
+                }
+
+                const { error: updateError } = await SyntraApp.sb.from("leads").update({ status: "Yopildi" }).eq("id", lead.id);
+                if (updateError) {
+                    SyntraApp.showToast("Lead status warning", "Student created, but the lead status was not updated.", "error");
+                } else {
+                    SyntraApp.showToast("Lead converted", "A new student record has been created.");
+                }
+
+                SyntraApp.closeModal("convertModal");
+                SyntraApp.setButtonLoading(convertBtn, false);
+                refreshData();
+            });
+
+            refreshData();
+        });
+    </script>
+</body>
+</html>

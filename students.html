@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyntraAI | Students</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+    <div class="app-grid"></div>
+    <div class="app-aurora"></div>
+
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar"></aside>
+
+        <div class="content">
+            <div class="mobile-topbar">
+                <button class="btn btn-secondary" id="openSidebar" type="button">Menu</button>
+                <div class="workspace-pill" id="workspaceBadge">Workspace</div>
+            </div>
+
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h1>Students</h1>
+                    <p>Maintain a reliable student registry with group assignment, search, filters, and export-ready records.</p>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-secondary" id="exportBtn" type="button">Export CSV</button>
+                    <button class="btn btn-primary" id="newStudentBtn" type="button">Add student</button>
+                </div>
+            </header>
+
+            <div class="page-stack">
+                <section class="stats-grid" id="statsGrid"></section>
+
+                <section class="panel">
+                    <div class="controls">
+                        <div class="search-wrap">
+                            <input class="search-field" id="searchInput" type="text" placeholder="Search by student name or phone">
+                        </div>
+                        <select class="select-field" id="groupFilter" style="max-width: 260px;">
+                            <option value="all">All groups</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <div class="panel-title">Student directory</div>
+                            <div class="panel-subtitle">Editable records with direct group context.</div>
+                        </div>
+                    </div>
+                    <div class="table-wrap" id="studentsTableWrap"></div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="studentModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title" id="modalTitle">Add student</div>
+                    <div class="modal-subtitle">Capture the student record and assign the correct learning group.</div>
+                </div>
+                <button class="btn btn-ghost" data-close-modal="studentModal" type="button">Close</button>
+            </div>
+
+            <form id="studentForm" class="form-grid">
+                <input id="studentId" type="hidden">
+                <div class="field-group">
+                    <label class="field-label" for="studentName">Full name</label>
+                    <input class="field" id="studentName" type="text" placeholder="Ali Valiyev" required>
+                </div>
+                <div class="form-grid two">
+                    <div class="field-group">
+                        <label class="field-label" for="studentPhone">Phone</label>
+                        <input class="field" id="studentPhone" type="tel" placeholder="+998 90 123 45 67" required>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label" for="studentGroupId">Group</label>
+                        <select class="select-field" id="studentGroupId">
+                            <option value="">No group</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-block" id="saveStudentBtn" type="submit">Save student</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="assets/app.js"></script>
+    <script>
+        let workspaceContext;
+        let allStudents = [];
+        let groups = [];
+        const params = new URLSearchParams(window.location.search);
+        const initialGroupFilter = params.get("group");
+
+        function renderStats() {
+            const assignedStudents = allStudents.filter((student) => student.group_id).length;
+            const unassignedStudents = allStudents.length - assignedStudents;
+            const activeGroups = new Set(allStudents.map((student) => student.group_id).filter(Boolean)).size;
+
+            document.getElementById("statsGrid").innerHTML = [
+                SyntraApp.statCard("Total students", String(allStudents.length), "All active student records"),
+                SyntraApp.statCard("Assigned", String(assignedStudents), `${unassignedStudents} currently unassigned`),
+                SyntraApp.statCard("Groups in use", String(activeGroups), `${groups.length} groups available`),
+                SyntraApp.statCard("New this month", String(allStudents.filter((student) => student.created_at && new Date(student.created_at).getMonth() === new Date().getMonth()).length), "Based on created date")
+            ].join("");
+        }
+
+        function fillGroupOptions() {
+            const selects = [document.getElementById("studentGroupId"), document.getElementById("groupFilter")];
+            selects.forEach((select) => {
+                const defaultOption = select.id === "groupFilter"
+                    ? `<option value="all">All groups</option>`
+                    : `<option value="">No group</option>`;
+                select.innerHTML = defaultOption + groups.map((group) => `
+                    <option value="${group.id}">${SyntraApp.escapeHtml(group.name)}</option>
+                `).join("");
+            });
+
+            if (initialGroupFilter && document.getElementById("groupFilter")) {
+                document.getElementById("groupFilter").value = initialGroupFilter;
+            }
+        }
+
+        function currentFilteredStudents() {
+            const term = document.getElementById("searchInput").value.trim().toLowerCase();
+            const groupFilter = document.getElementById("groupFilter").value;
+
+            return allStudents.filter((student) => {
+                const haystack = `${student.full_name || ""} ${student.phone || ""} ${student.groups?.name || ""}`.toLowerCase();
+                const matchesSearch = haystack.includes(term);
+                const matchesGroup = groupFilter === "all" ? true : student.group_id === groupFilter;
+                return matchesSearch && matchesGroup;
+            });
+        }
+
+        function renderTable() {
+            const container = document.getElementById("studentsTableWrap");
+            const filtered = currentFilteredStudents();
+
+            if (!filtered.length) {
+                container.innerHTML = SyntraApp.emptyState("No students found", "Adjust filters or add a new student.");
+                return;
+            }
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Phone</th>
+                            <th>Group</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filtered.map((student) => `
+                            <tr>
+                                <td class="cell-primary">${SyntraApp.escapeHtml(student.full_name || "")}</td>
+                                <td>${SyntraApp.escapeHtml(student.phone || "")}</td>
+                                <td><span class="badge badge-primary">${SyntraApp.escapeHtml(student.groups?.name || "No group")}</span></td>
+                                <td>${SyntraApp.escapeHtml(SyntraApp.formatDate(student.created_at))}</td>
+                                <td>
+                                    <div class="table-actions">
+                                        <button class="btn btn-secondary" type="button" onclick="editStudent('${student.id}')">Edit</button>
+                                        <button class="btn btn-danger" type="button" onclick="deleteStudent('${student.id}')">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function resetForm() {
+            document.getElementById("studentForm").reset();
+            document.getElementById("studentId").value = "";
+            document.getElementById("modalTitle").textContent = "Add student";
+            if (initialGroupFilter) {
+                document.getElementById("studentGroupId").value = initialGroupFilter;
+            }
+        }
+
+        async function refreshData() {
+            const [studentsRes, groupsRes] = await Promise.all([
+                SyntraApp.sb.from("students").select("*, groups(name)").eq("workspace_id", workspaceContext.workspace.id).order("created_at", { ascending: false }),
+                SyntraApp.sb.from("groups").select("id, name").eq("workspace_id", workspaceContext.workspace.id).order("name", { ascending: true })
+            ]);
+
+            allStudents = studentsRes.data || [];
+            groups = groupsRes.data || [];
+            fillGroupOptions();
+            renderStats();
+            renderTable();
+        }
+
+        window.editStudent = function editStudent(id) {
+            const student = allStudents.find((item) => item.id === id);
+            if (!student) return;
+
+            document.getElementById("studentId").value = student.id;
+            document.getElementById("studentName").value = student.full_name || "";
+            document.getElementById("studentPhone").value = student.phone || "";
+            document.getElementById("studentGroupId").value = student.group_id || "";
+            document.getElementById("modalTitle").textContent = "Edit student";
+            SyntraApp.openModal("studentModal");
+        };
+
+        window.deleteStudent = async function deleteStudent(id) {
+            if (!window.confirm("Delete this student?")) return;
+            const { error } = await SyntraApp.sb.from("students").delete().eq("id", id);
+            if (error) {
+                SyntraApp.showToast("Delete failed", SyntraApp.parseError(error), "error");
+                return;
+            }
+
+            SyntraApp.showToast("Student deleted", "The record has been removed.");
+            refreshData();
+        };
+
+        window.addEventListener("load", async () => {
+            workspaceContext = await SyntraApp.requireWorkspace("students");
+            if (!workspaceContext) return;
+
+            document.getElementById("statsGrid").innerHTML = [
+                SyntraApp.statCard("Total students", "0", "Loading"),
+                SyntraApp.statCard("Assigned", "0", "Loading"),
+                SyntraApp.statCard("Groups in use", "0", "Loading"),
+                SyntraApp.statCard("New this month", "0", "Loading")
+            ].join("");
+
+            document.getElementById("newStudentBtn").addEventListener("click", () => {
+                resetForm();
+                SyntraApp.openModal("studentModal");
+            });
+
+            document.getElementById("searchInput").addEventListener("input", renderTable);
+            document.getElementById("groupFilter").addEventListener("change", renderTable);
+
+            document.getElementById("exportBtn").addEventListener("click", () => {
+                SyntraApp.exportCsv(
+                    "students.csv",
+                    ["Student", "Phone", "Group", "Created"],
+                    currentFilteredStudents().map((student) => [
+                        student.full_name || "",
+                        student.phone || "",
+                        student.groups?.name || "No group",
+                        SyntraApp.formatDate(student.created_at)
+                    ])
+                );
+            });
+
+            document.getElementById("studentForm").addEventListener("submit", async (event) => {
+                event.preventDefault();
+                const saveBtn = document.getElementById("saveStudentBtn");
+                SyntraApp.setButtonLoading(saveBtn, true, "Saving...");
+
+                const id = document.getElementById("studentId").value;
+                const payload = {
+                    name: document.getElementById("studentName").value.trim(),
+                    phone: document.getElementById("studentPhone").value.trim(),
+                    group_id: document.getElementById("studentGroupId").value || null,
+                    workspace_id: workspaceContext.workspace.id
+                };
+
+                const query = id
+                    ? SyntraApp.sb.from("students").update(payload).eq("id", id)
+                    : SyntraApp.sb.from("students").insert([payload]);
+                const { error } = await query;
+
+                if (error) {
+                    SyntraApp.showToast("Save failed", SyntraApp.parseError(error), "error");
+                    SyntraApp.setButtonLoading(saveBtn, false);
+                    return;
+                }
+
+                SyntraApp.showToast(id ? "Student updated" : "Student added", "Student data saved successfully.");
+                SyntraApp.closeModal("studentModal");
+                SyntraApp.setButtonLoading(saveBtn, false);
+                refreshData();
+            });
+
+            refreshData();
+        });
+    </script>
+</body>
+</html>
