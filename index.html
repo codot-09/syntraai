@@ -3,194 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SyntraAI | Operatsion Mukammallik</title>
+    <title>SyntraAI | Education Operations Platform</title>
+    <meta name="description" content="SyntraAI is a modern academic operations workspace for leads, students, groups and payments. Minimal, fast, and ready for growing training teams.">
+    <link rel="canonical" href="https://yourdomain.com/">
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Sora:wght@600;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/app.css">
-    <style>
-        :root {
-            --accent: #6366f1;
-            --accent-glow: rgba(99, 102, 241, 0.5);
-        }
-        body { background: #030712; color: #fff; overflow-x: hidden; }
-        #canvas-container { position: fixed; top: 0; left: 0; z-index: -1; pointer-events: none; }
-        
-        .hero-section {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 0 20px;
-        }
-
-        .glass-card {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 24px;
-            padding: 40px;
-            transition: transform 0.3s ease;
-        }
-
-        .pricing-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            max-width: 1000px;
-            margin: 60px auto;
-        }
-
-        .price-card {
-            position: relative;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .price-card.featured {
-            border-color: var(--accent);
-            box-shadow: 0 0 40px var(--accent-glow);
-        }
-
-        .price-val { font-size: 48px; font-weight: 800; font-family: 'Sora'; margin: 20px 0; }
-        .price-val span { font-size: 16px; opacity: 0.6; }
-
-        .floating-icon {
-            animation: float 6s ease-in-out infinite;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
-        }
-
-        .btn-xl {
-            padding: 18px 42px;
-            font-size: 18px;
-            font-weight: 700;
-            border-radius: 100px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-    </style>
 </head>
 <body>
-    <div id="canvas-container"></div>
+    <div class="app-grid"></div>
+    <div class="app-aurora"></div>
 
-    <main class="app-shell" style="background: transparent;">
-        <section class="hero-section">
-            <div style="max-width: 900px;">
-                <div class="eyebrow floating-icon" style="background: var(--accent); color: white; padding: 8px 20px; border-radius: 50px; display: inline-block; margin-bottom: 24px;">
-                    Next-Gen Education OS
-                </div>
-                <h1 class="hero-title" style="font-size: clamp(40px, 8vw, 80px); line-height: 1.1; margin-bottom: 30px;">
-                    Akademiyangizni <span style="color: var(--accent)">Kosmik</span> tezlikda boshqaring.
-                </h1>
-                <p class="hero-description" style="font-size: 20px; opacity: 0.8; margin-bottom: 40px;">
-                    SyntraAI — bu leadlar, moliya va o'quv jarayonini bitta intellektual ekotizimga birlashtiruvchi platforma.
+    <div class="auth-shell">
+        <div class="auth-card">
+            <section class="marketing-panel">
+                <div class="eyebrow">SyntraAI Platform</div>
+                <h1 class="hero-title">Minimal, intelligent operations for modern education teams.</h1>
+                <p class="hero-description">
+                    SyntraAI brings leads, groups, students, and payments into one focused workspace so your team can run faster with less noise.
                 </p>
-                <button class="btn btn-primary btn-xl" id="loginBtn">Boshlash — mutlaqo bepul</button>
-            </div>
-        </section>
 
-        <section style="padding: 100px 20px; text-align: center;">
-            <h2 class="panel-title" style="font-size: 40px; margin-bottom: 10px;">Oddiy va shaffof narxlar</h2>
-            <p class="panel-subtitle">Yashirin to'lovlar yo'q. Faqat natija uchun to'lang.</p>
+                <div class="feature-list">
+                    <div class="feature-card">
+                        <div class="list-title">Unified workspace</div>
+                        <div class="list-meta">One calm control center for growth, teaching operations, and finance.</div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="list-title">Operational visibility</div>
+                        <div class="list-meta">See revenue, lead flow, student load, and group performance without switching tabs.</div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="list-title">Built for action</div>
+                        <div class="list-meta">Fast CRUD flows, exports, conversion workflows, and workspace-level structure from day one.</div>
+                    </div>
+                </div>
+            </section>
 
-            <div class="pricing-grid">
-                <div class="glass-card price-card">
-                    <div class="list-title">Monthly Growth</div>
-                    <div class="price-val">$49<span>/oyiga</span></div>
-                    <ul style="text-align: left; list-style: none; padding: 0; margin: 30px 0; opacity: 0.8;">
-                        <li style="margin-bottom: 12px;">✓ Cheksiz Leadlar</li>
-                        <li style="margin-bottom: 12px;">✓ 5 ta Workspace</li>
-                        <li style="margin-bottom: 12px;">✓ Moliyaviy Analitika</li>
-                        <li style="margin-bottom: 12px;">✓ 24/7 Support</li>
-                    </ul>
-                    <button class="btn btn-secondary btn-block">Tanlash</button>
+            <section class="auth-panel">
+                <div class="brand" style="margin-bottom: 28px;">
+                    <img class="brand-logo" src="assets/syntraavatar.png" alt="SyntraAI">
+                    <div class="brand-mark">
+                        <div class="brand-name">SyntraAI</div>
+                        <div class="brand-subtitle">Professional SaaS for education teams</div>
+                    </div>
                 </div>
 
-                <div class="glass-card price-card featured">
-                    <div class="badge badge-primary" style="position: absolute; top: 20px; right: 20px;">Eng mashhur</div>
-                    <div class="list-title">Yearly Scale</div>
-                    <div class="price-val">$399<span>/yiliga</span></div>
-                    <div style="color: #4ade80; font-weight: 600; margin-bottom: 20px;">Yiliga $189 tejang!</div>
-                    <ul style="text-align: left; list-style: none; padding: 0; margin: 30px 0; opacity: 0.9;">
-                        <li style="margin-bottom: 12px;">✓ Barcha "Monthly" imkoniyatlar</li>
-                        <li style="margin-bottom: 12px;">✓ VIP Konsultatsiya</li>
-                        <li style="margin-bottom: 12px;">✓ Maxsus Brending</li>
-                        <li style="margin-bottom: 12px;">✓ API Access</li>
-                    </ul>
-                    <button class="btn btn-primary btn-block">Hozir tejashni boshlang</button>
+                <div class="panel" style="padding: 0; border: none; box-shadow: none; background: transparent;">
+                    <div class="panel-header" style="margin-bottom: 14px;">
+                        <div>
+                            <div class="panel-title">Sign in and launch your workspace</div>
+                            <div class="panel-subtitle">Use Google authentication to create or access your organization dashboard.</div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary btn-block" id="loginBtn" type="button">Continue with Google</button>
+
+                    <div class="list-stack" style="margin-top: 18px;">
+                        <div class="list-item">
+                            <div>
+                                <div class="list-title">What you get</div>
+                                <div class="list-meta">Dashboard, lead CRM, group operations, student registry, and payments.</div>
+                            </div>
+                            <span class="badge badge-primary">Ready</span>
+                        </div>
+                        <div class="list-item">
+                            <div>
+                                <div class="list-title">Ideal for</div>
+                                <div class="list-meta">Training centers, bootcamps, language schools, and private academies.</div>
+                            </div>
+                            <span class="badge badge-success">SaaS</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </section>
-    </main>
+            </section>
+        </div>
+    </div>
 
     <script src="assets/app.js"></script>
     <script>
-        // --- 3D Background (Three.js) ---
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.getElementById('canvas-container').appendChild(renderer.domElement);
+        const loginBtn = document.getElementById("loginBtn");
 
-        const particlesGeometry = new THREE.BufferGeometry();
-        const posArray = new Float32Array(5000 * 3);
-        for(let i=0; i < 5000 * 3; i++) posArray[i] = (Math.random() - 0.5) * 10;
-        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-
-        const material = new THREE.PointsMaterial({ size: 0.005, color: '#6366f1', transparent: true, opacity: 0.5 });
-        const particlesMesh = new THREE.Points(particlesGeometry, material);
-        scene.add(particlesMesh);
-
-        camera.position.z = 3;
-
-        function animate() {
-            requestAnimationFrame(animate);
-            particlesMesh.rotation.y += 0.001;
-            particlesMesh.rotation.x += 0.0005;
-            renderer.render(scene, camera);
-        }
-        animate();
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        // --- Animations (GSAP) ---
-        gsap.from(".hero-title", { duration: 1.5, y: 100, opacity: 0, ease: "power4.out" });
-        gsap.from(".hero-description", { duration: 1.5, y: 50, opacity: 0, delay: 0.3, ease: "power4.out" });
-        gsap.from(".price-card", { 
-            scrollTrigger: ".pricing-grid", 
-            duration: 1, 
-            y: 100, 
-            opacity: 0, 
-            stagger: 0.2, 
-            ease: "expo.out" 
-        });
-
-        // --- Auth Logic ---
-        document.getElementById("loginBtn").addEventListener("click", async () => {
-            const btn = document.getElementById("loginBtn");
-            SyntraApp.setButtonLoading(btn, true, "Tayyorlanmoqda...");
-            await SyntraApp.sb.auth.signInWithOAuth({
+        loginBtn.addEventListener("click", async () => {
+            SyntraApp.setButtonLoading(loginBtn, true, "Redirecting...");
+            const { error } = await SyntraApp.sb.auth.signInWithOAuth({
                 provider: "google",
-                options: { redirectTo: `${window.location.origin}/workspace-create.html` }
+                options: {
+                    redirectTo: `${window.location.origin}/workspace-create.html`
+                }
             });
+
+            if (error) {
+                SyntraApp.showToast("Login failed", SyntraApp.parseError(error), "error");
+                SyntraApp.setButtonLoading(loginBtn, false);
+            }
         });
 
         window.addEventListener("load", async () => {
             const { data: { session } } = await SyntraApp.sb.auth.getSession();
-            if (session) window.location.href = "workspace-create.html";
+            if (session) {
+                window.location.href = "workspace-create.html";
+            }
         });
     </script>
 </body>
