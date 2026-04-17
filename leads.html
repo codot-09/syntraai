@@ -348,7 +348,7 @@
 
                 if (status === "enrolled" && (!editingLead || editingLead.status !== "enrolled")) {
                     const convertResponse = await SyntraApp.sb.from("students").insert([{
-                        full_name: payload.name,
+                        name: payload.name,
                         phone: payload.phone,
                         group_id: null,
                         workspace_id: workspaceContext.workspace.id

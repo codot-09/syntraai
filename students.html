@@ -241,7 +241,7 @@
             if (!student) return;
 
             document.getElementById("studentId").value = student.id;
-            document.getElementById("studentName").value = student.full_name || "";
+            document.getElementById("studentName").value = student.name || "";
             document.getElementById("studentPhone").value = student.phone || "";
             selectedStudentGroupId = student.group_id || "";
             document.getElementById("studentGroupSearch").value = "";
@@ -287,7 +287,7 @@
                     "students.csv",
                     ["Student", "Phone", "Group", "Created"],
                     currentFilteredStudents().map((student) => [
-                        student.full_name || "",
+                        student.name || "",
                         student.phone || "",
                         student.groups?.name || "No group",
                         SyntraApp.formatDate(student.created_at)
