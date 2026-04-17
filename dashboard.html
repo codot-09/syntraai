@@ -14,45 +14,49 @@
             position: fixed;
             bottom: 30px;
             right: 30px;
-            width: 60px;
-            height: 60px;
-            border-radius: 18px;
-            background: #4f46e5;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--accent);
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
-            z-index: 999;
-            transition: all 0.3s ease;
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+            z-index: 1000;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             border: none;
         }
-
         .chatbot-trigger:hover {
-            transform: translateY(-3px);
-            background: #4338ca;
-            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 12px 32px rgba(99, 102, 241, 0.4);
+        }
+        .chatbot-trigger svg {
+            width: 24px;
+            height: 24px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
         .chatbot-panel {
             position: fixed;
             top: 0;
-            right: -420px;
-            width: 400px;
+            right: -400px;
+            width: 380px;
             height: 100%;
             background: #ffffff;
-            box-shadow: -5px 0 30px rgba(0, 0, 0, 0.1);
-            z-index: 1001;
+            box-shadow: -10px 0 40px rgba(0, 0, 0, 0.1);
+            z-index: 2000;
             transition: right 0.4s cubic-bezier(0.25, 1, 0.5, 1);
             display: flex;
             flex-direction: column;
             border-left: 1px solid #e5e7eb;
         }
-
-        .chatbot-panel.open {
-            right: 0;
-        }
+        .chatbot-panel.open { right: 0; }
 
         .chatbot-header {
             padding: 20px 24px;
@@ -62,12 +66,7 @@
             align-items: center;
             justify-content: space-between;
         }
-
-        .chatbot-header h3 {
-            margin: 0;
-            font-size: 18px;
-            color: #111827;
-        }
+        .chatbot-header h3 { margin: 0; font-size: 18px; color: #111827; }
 
         .chatbot-content {
             flex: 1;
@@ -77,7 +76,6 @@
             justify-content: center;
             padding: 40px;
             text-align: center;
-            background: #ffffff;
         }
 
         .ai-loader {
@@ -86,32 +84,27 @@
             height: 80px;
             margin-bottom: 24px;
         }
-
         .ai-circle {
             position: absolute;
             width: 100%;
             height: 100%;
             border: 3px solid #f3f4f6;
-            border-top-color: #4f46e5;
+            border-top-color: var(--accent);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-
         .ai-core {
             position: absolute;
             top: 25px;
             left: 25px;
             width: 30px;
             height: 30px;
-            background: #4f46e5;
+            background: var(--accent);
             border-radius: 50%;
             animation: pulse 1.5s ease-in-out infinite;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
+        @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse {
             0%, 100% { transform: scale(0.85); opacity: 0.7; }
             50% { transform: scale(1.1); opacity: 1; }
@@ -119,7 +112,7 @@
 
         .status-tag {
             background: #eef2ff;
-            color: #4f46e5;
+            color: var(--accent);
             padding: 4px 12px;
             border-radius: 100px;
             font-size: 11px;
@@ -134,27 +127,13 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.3);
-            z-index: 1000;
+            background: rgba(0, 0, 0, 0.2);
+            z-index: 1999;
             display: none;
             opacity: 0;
             transition: opacity 0.3s ease;
         }
-
-        .chatbot-overlay.active {
-            display: block;
-            opacity: 1;
-        }
-
-        .close-btn {
-            background: #f3f4f6;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            color: #4b5563;
-        }
+        .chatbot-overlay.active { display: block; opacity: 1; }
     </style>
 </head>
 <body>
@@ -173,26 +152,75 @@
             <header class="topbar">
                 <div class="topbar-left">
                     <h1>Command Center</h1>
-                    <p>Track growth, operations, and finance in one focused view.</p>
+                    <p>Track growth, operations, and finance in one focused view for your workspace.</p>
                 </div>
                 <div class="topbar-actions">
-                    <a class="btn btn-secondary" id="groupsShortcut" href="#">Groups</a>
-                    <a class="btn btn-primary" id="paymentsShortcut" href="#">Payments</a>
+                    <a class="btn btn-secondary" id="groupsShortcut" href="#">Manage groups</a>
+                    <a class="btn btn-primary" id="paymentsShortcut" href="#">Record payment</a>
                 </div>
             </header>
 
             <div class="page-stack">
                 <section class="hero-panel hero-grid">
                     <div>
-                        <div class="eyebrow">Live Snapshot</div>
-                        <div class="hero-title">Professional visibility for your workspace.</div>
+                        <div class="eyebrow">Live operating snapshot</div>
+                        <div class="hero-title">Professional visibility across enrollment, learning, and revenue.</div>
+                        <p class="hero-description">
+                            This workspace is designed to help you act quickly: convert leads, spot weak areas, and keep teaching operations stable.
+                        </p>
                         <div class="hero-actions">
-                            <a class="btn btn-primary" id="studentsShortcut" href="#">Students</a>
+                            <a class="btn btn-primary" id="studentsShortcut" href="#">Open students</a>
+                            <a class="btn btn-secondary" id="leadsShortcut" href="#">Review leads</a>
                         </div>
                     </div>
                     <div class="hero-kpis" id="heroKpis"></div>
                 </section>
+
                 <section class="stats-grid" id="statsGrid"></section>
+
+                <section class="dual-grid">
+                    <article class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <div class="panel-title">Recent payments</div>
+                                <div class="panel-subtitle">Latest completed transactions.</div>
+                            </div>
+                        </div>
+                        <div id="recentPayments"></div>
+                    </article>
+
+                    <article class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <div class="panel-title">Lead pipeline</div>
+                                <div class="panel-subtitle">Funnel momentum and conversion.</div>
+                            </div>
+                        </div>
+                        <div id="leadBreakdown"></div>
+                    </article>
+                </section>
+
+                <section class="dual-grid">
+                    <article class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <div class="panel-title">Group performance</div>
+                                <div class="panel-subtitle">Student load across current groups.</div>
+                            </div>
+                        </div>
+                        <div id="groupHealth"></div>
+                    </article>
+
+                    <article class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <div class="panel-title">Action queue</div>
+                                <div class="panel-subtitle">The most valuable next steps today.</div>
+                            </div>
+                        </div>
+                        <div id="actionQueue" class="list-stack"></div>
+                    </article>
+                </section>
             </div>
         </div>
     </div>
@@ -201,7 +229,7 @@
     <div class="chatbot-panel" id="chatbotPanel">
         <div class="chatbot-header">
             <h3>Syntra AI Assistant</h3>
-            <button class="close-btn" id="closeChatbot">Close</button>
+            <button class="btn btn-ghost btn-sm" id="closeChatbot">Close</button>
         </div>
         <div class="chatbot-content">
             <div class="ai-loader">
@@ -209,20 +237,30 @@
                 <div class="ai-core"></div>
             </div>
             <div class="status-tag">Coming Soon</div>
-            <h2 style="color: #111827; margin-bottom: 12px;">Assistant is training</h2>
-            <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">AI chatbot tizimi hozirda optimallashtirilmoqda. Tez orada barcha savollaringizga avtomatik javob olishingiz mumkin bo'ladi.</p>
+            <h2 style="color: #111827; margin-bottom: 12px; font-family: 'Sora';">Assistant is training</h2>
+            <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">Bizning AI agentimiz hozirda sizning ma'lumotlaringizni tahlil qilishni o'rganmoqda. Tez orada bu yerda aqlli chat va avtomatlashtirish funksiyalari paydo bo'ladi.</p>
         </div>
     </div>
 
-    <button class="chatbot-trigger" id="chatbotTrigger">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+    <button class="chatbot-trigger" id="chatbotTrigger" title="AI Assistant">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
     </button>
 
     <script src="assets/app.js"></script>
     <script>
+        function monthStart() {
+            const now = new Date();
+            return new Date(now.getFullYear(), now.getMonth(), 1);
+        }
+
+        function recent(items, count = 5) {
+            return items.slice(0, count);
+        }
+
         window.addEventListener("load", async () => {
             const context = await SyntraApp.requireWorkspace("dashboard");
             if (!context) return;
+
             const { workspace } = context;
 
             const trigger = document.getElementById("chatbotTrigger");
@@ -242,22 +280,106 @@
             document.getElementById("groupsShortcut").href = SyntraApp.withWorkspace("groups.html", workspace.slug);
             document.getElementById("paymentsShortcut").href = SyntraApp.withWorkspace("payment.html", workspace.slug);
             document.getElementById("studentsShortcut").href = SyntraApp.withWorkspace("students.html", workspace.slug);
+            document.getElementById("leadsShortcut").href = SyntraApp.withWorkspace("leads.html", workspace.slug);
 
-            const [groupsRes, studentsRes, paymentsRes] = await Promise.all([
+            document.getElementById("heroKpis").innerHTML = SyntraApp.loadingState("Syncing", "Fetching metrics...");
+
+            const [groupsRes, studentsRes, leadsRes, paymentsRes] = await Promise.all([
                 SyntraApp.sb.from("groups").select("*").eq("workspace_id", workspace.id),
-                SyntraApp.sb.from("students").select("*").eq("workspace_id", workspace.id),
-                SyntraApp.sb.from("payments").select("*").eq("workspace_id", workspace.id)
+                SyntraApp.sb.from("students").select("*, group_students(group_id)").eq("workspace_id", workspace.id),
+                SyntraApp.sb.from("leads").select("*").eq("workspace_id", workspace.id),
+                SyntraApp.sb.from("payments").select("*, students(name)").eq("workspace_id", workspace.id).order("created_at", { ascending: false })
             ]);
 
             const groups = groupsRes.data || [];
             const students = studentsRes.data || [];
+            const leads = leadsRes.data || [];
             const payments = paymentsRes.data || [];
 
+            const totalRevenue = payments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+            const mStart = monthStart();
+            const monthRevenue = payments
+                .filter(p => p.created_at && new Date(p.created_at) >= mStart)
+                .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+            const activeLeads = leads.filter(l => ["new", "contacted"].includes(String(l.status).toLowerCase())).length;
+            const groupStudentCounts = students.reduce((acc, s) => {
+                s.group_students?.forEach(gs => { acc[gs.group_id] = (acc[gs.group_id] || 0) + 1; });
+                return acc;
+            }, {});
+
+            document.getElementById("heroKpis").innerHTML = `
+                <div class="mini-card">
+                    <div class="metric-label">Revenue this month</div>
+                    <div class="metric-value">${SyntraApp.formatMoney(monthRevenue)}</div>
+                </div>
+                <div class="mini-card">
+                    <div class="metric-label">Active leads</div>
+                    <div class="metric-value">${activeLeads}</div>
+                </div>
+            `;
+
             document.getElementById("statsGrid").innerHTML = [
-                SyntraApp.statCard("Groups", String(groups.length)),
-                SyntraApp.statCard("Students", String(students.length)),
-                SyntraApp.statCard("Total Revenue", SyntraApp.formatMoney(payments.reduce((s, i) => s + Number(i.amount || 0), 0)))
+                SyntraApp.statCard("Groups", String(groups.length), "Active groups"),
+                SyntraApp.statCard("Students", String(students.length), "Total enrollment"),
+                SyntraApp.statCard("Pipeline", String(leads.length), "Lead volume"),
+                SyntraApp.statCard("Total revenue", SyntraApp.formatMoney(totalRevenue), "Gross earnings")
             ].join("");
+
+            document.getElementById("recentPayments").innerHTML = payments.length ? `
+                <div class="list-stack">
+                    ${recent(payments).map(p => `
+                        <div class="list-item">
+                            <div>
+                                <div class="list-title">${SyntraApp.escapeHtml(p.students?.name || "Unknown")}</div>
+                                <div class="list-meta">${SyntraApp.formatDate(p.created_at)}</div>
+                            </div>
+                            <div class="value-positive">${SyntraApp.formatMoney(p.amount)}</div>
+                        </div>
+                    `).join("")}
+                </div>` : SyntraApp.emptyState("No payments", "Finance trail is empty.");
+
+            const stages = [
+                { l: "New", k: "new", c: "badge-primary" },
+                { l: "Contacted", k: "contacted", c: "badge-warning" },
+                { l: "Enrolled", k: "enrolled", c: "badge-success" }
+            ];
+            document.getElementById("leadBreakdown").innerHTML = leads.length ? `
+                <div class="list-stack">
+                    ${stages.map(s => `
+                        <div class="list-item">
+                            <div class="list-title">${s.l}</div>
+                            <span class="badge ${s.c}">${leads.filter(l => String(l.status).toLowerCase() === s.k).length}</span>
+                        </div>
+                    `).join("")}
+                </div>` : SyntraApp.emptyState("No leads", "No activity.");
+
+            document.getElementById("groupHealth").innerHTML = groups.length ? `
+                <div class="list-stack">
+                    ${groups.slice(0, 5).map(g => `
+                        <div class="list-item">
+                            <div>
+                                <div class="list-title">${SyntraApp.escapeHtml(g.name)}</div>
+                                <div class="list-meta">${SyntraApp.escapeHtml(g.schedule || "No schedule")}</div>
+                            </div>
+                            <div class="cell-primary">${groupStudentCounts[g.id] || 0} students</div>
+                        </div>
+                    `).join("")}
+                </div>` : SyntraApp.emptyState("No groups", "Structure needed.");
+
+            const actions = [];
+            if (activeLeads > 0) actions.push(["Follow up leads", `${activeLeads} waiting`, "leads.html"]);
+            if (groups.length === 0) actions.push(["Define groups", "Create learning structure", "groups.html"]);
+            
+            document.getElementById("actionQueue").innerHTML = (actions.length ? actions : [["All caught up", "No urgent tasks", "dashboard.html"]]).map(a => `
+                <a class="list-item" href="${SyntraApp.withWorkspace(a[2], workspace.slug)}">
+                    <div>
+                        <div class="list-title">${a[0]}</div>
+                        <div class="list-meta">${a[1]}</div>
+                    </div>
+                    <span class="badge badge-primary">Go</span>
+                </a>
+            `).join("");
         });
     </script>
 </body>
