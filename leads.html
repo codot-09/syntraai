@@ -141,6 +141,7 @@
         let allLeads = [];
         let groups = [];
         let editingLead = null;
+        let selectedConvertGroupId = "";
 
         function badgeForStatus(status) {
             if (status === "enrolled") return "badge-success";
@@ -228,30 +229,44 @@
             `;
         }
 
-        function resetLeadForm() {
-            editingLead = null;
-            document.getElementById("leadForm").reset();
-            document.getElementById("leadId").value = "";
-            document.getElementById("leadModalTitle").textContent = "Add lead";
-            document.getElementById("leadStatus").value = "new";
-        }
+        function renderConvertGroupChooser() {
+            const list = document.getElementById("convertGroupList");
+            const searchTerm = document.getElementById("convertGroupSearch").value.trim().toLowerCase();
+            const filteredGroups = groups.filter((group) => group.name.toLowerCase().includes(searchTerm));
 
-        function fillGroupOptions() {
-            document.getElementById("convertGroupId").innerHTML = `
-                <option value="">No group yet</option>
-                ${groups.map((group) => `<option value="${group.id}">${SyntraApp.escapeHtml(group.name)}</option>`).join("")}
-            `;
+            if (!filteredGroups.length) {
+                list.innerHTML = `<div class="empty-state"><h3>No groups match</h3><p>Try another group name.</p></div>`;
+                return;
+            }
+
+            list.innerHTML = filteredGroups.map((group) => {
+                const isSelected = selectedConvertGroupId === group.id ? " checked" : "";
+                return `
+                    <label class="checkbox-card radio-style">
+                        <input type="radio" name="convertGroup" value="${group.id}" ${isSelected}>
+                        <div>
+                            <div class="list-title">${SyntraApp.escapeHtml(group.name)}</div>
+                            <div class="list-meta">${SyntraApp.escapeHtml(group.schedule || "No schedule")}</div>
+                        </div>
+                    </label>
+                `;
+            }).join("");
+
+            document.querySelectorAll("#convertGroupList input[name='convertGroup']").forEach((input) => {
+                input.addEventListener("change", () => {
+                    selectedConvertGroupId = input.value;
+                });
+            });
         }
 
         async function refreshData() {
             const [leadsRes, groupsRes] = await Promise.all([
                 SyntraApp.sb.from("leads").select("*").eq("workspace_id", workspaceContext.workspace.id).order("created_at", { ascending: false }),
-                SyntraApp.sb.from("groups").select("id, name").eq("workspace_id", workspaceContext.workspace.id).order("name", { ascending: true })
+                SyntraApp.sb.from("groups").select("id, name, schedule").eq("workspace_id", workspaceContext.workspace.id).order("name", { ascending: true })
             ]);
 
             allLeads = leadsRes.data || [];
             groups = groupsRes.data || [];
-            fillGroupOptions();
             renderStats();
             renderLeads();
         }
@@ -271,7 +286,9 @@
 
         window.openConvert = function openConvert(id) {
             document.getElementById("convertLeadId").value = id;
-            document.getElementById("convertGroupId").value = "";
+            selectedConvertGroupId = "";
+            document.getElementById("convertGroupSearch").value = "";
+            renderConvertGroupChooser();
             SyntraApp.openModal("convertModal");
         };
 
@@ -282,7 +299,6 @@
                 SyntraApp.showToast("Delete failed", SyntraApp.parseError(error), "error");
                 return;
             }
-
             SyntraApp.showToast("Lead deleted", "The lead was removed from the pipeline.");
             refreshData();
         };
@@ -291,34 +307,32 @@
             workspaceContext = await SyntraApp.requireWorkspace("leads");
             if (!workspaceContext) return;
 
-            document.getElementById("statsGrid").innerHTML = [
-                SyntraApp.statCard("All leads", "0", "Loading"),
-                SyntraApp.statCard("New", "0", "Loading"),
-                SyntraApp.statCard("Contacted", "0", "Loading"),
-                SyntraApp.statCard("Enrollment rate", "0%", "Loading")
-            ].join("");
+            // Adjust Convert Modal UI
+            const convertForm = document.getElementById("convertForm");
+            convertForm.innerHTML = `
+                <input id="convertLeadId" type="hidden">
+                <div class="field-group">
+                    <label class="field-label" for="convertGroupSearch">Search group</label>
+                    <input class="field" id="convertGroupSearch" type="search" placeholder="Find group by name">
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Assign group</label>
+                    <div id="convertGroupList" class="multi-checkbox-grid">Loading groups...</div>
+                </div>
+                <button class="btn btn-primary btn-block" id="convertBtn" type="submit">Convert lead</button>
+            `;
 
             document.getElementById("newLeadBtn").addEventListener("click", () => {
-                resetLeadForm();
+                editingLead = null;
+                document.getElementById("leadForm").reset();
+                document.getElementById("leadId").value = "";
+                document.getElementById("leadModalTitle").textContent = "Add lead";
                 SyntraApp.openModal("leadModal");
             });
 
             document.getElementById("searchInput").addEventListener("input", renderLeads);
             document.getElementById("statusFilter").addEventListener("change", renderLeads);
-
-            document.getElementById("exportBtn").addEventListener("click", () => {
-                SyntraApp.exportCsv(
-                    "leads.csv",
-                    ["Name", "Phone", "Status", "Source", "Created"],
-                    filteredLeads().map((lead) => [
-                        lead.name || "",
-                        lead.phone || "",
-                        lead.status || "",
-                        lead.source || "",
-                        SyntraApp.formatDate(lead.created_at)
-                    ])
-                );
-            });
+            document.getElementById("convertGroupSearch").addEventListener("input", renderConvertGroupChooser);
 
             document.getElementById("leadForm").addEventListener("submit", async (event) => {
                 event.preventDefault();
@@ -326,19 +340,17 @@
                 SyntraApp.setButtonLoading(saveBtn, true, "Saving...");
 
                 const id = document.getElementById("leadId").value;
-                const status = document.getElementById("leadStatus").value;
                 const payload = {
                     name: document.getElementById("leadName").value.trim(),
                     phone: document.getElementById("leadPhone").value.trim(),
-                    status,
+                    status: document.getElementById("leadStatus").value,
                     source: document.getElementById("leadSource").value.trim(),
                     workspace_id: workspaceContext.workspace.id
                 };
 
-                const query = id
-                    ? SyntraApp.sb.from("leads").update(payload).eq("id", id)
-                    : SyntraApp.sb.from("leads").insert([payload]);
-                const { error } = await query;
+                const { error } = id 
+                    ? await SyntraApp.sb.from("leads").update(payload).eq("id", id)
+                    : await SyntraApp.sb.from("leads").insert([payload]);
 
                 if (error) {
                     SyntraApp.showToast("Save failed", SyntraApp.parseError(error), "error");
@@ -346,21 +358,7 @@
                     return;
                 }
 
-                if (status === "enrolled" && (!editingLead || editingLead.status !== "enrolled")) {
-                    const convertResponse = await SyntraApp.sb.from("students").insert([{
-                        name: payload.name,
-                        phone: payload.phone,
-                        group_id: null,
-                        workspace_id: workspaceContext.workspace.id
-                    }]);
-                    if (convertResponse.error) {
-                        SyntraApp.showToast("Student creation failed", SyntraApp.parseError(convertResponse.error), "error");
-                        SyntraApp.setButtonLoading(saveBtn, false);
-                        return;
-                    }
-                }
-
-                SyntraApp.showToast(id ? "Lead updated" : "Lead added", "Pipeline information is now current.");
+                SyntraApp.showToast(id ? "Lead updated" : "Lead added", "Pipeline information saved.");
                 SyntraApp.closeModal("leadModal");
                 SyntraApp.setButtonLoading(saveBtn, false);
                 refreshData();
@@ -373,32 +371,37 @@
 
                 const leadId = document.getElementById("convertLeadId").value;
                 const lead = allLeads.find((item) => item.id === leadId);
-                if (!lead) {
-                    SyntraApp.showToast("Lead not found", "Please refresh and try again.", "error");
-                    SyntraApp.setButtonLoading(convertBtn, false);
-                    return;
-                }
+                if (!lead) return;
 
-                const { error: insertError } = await SyntraApp.sb.from("students").insert([{
-                    full_name: lead.name,
+                // 1. Create Student
+                const { data: studentData, error: studentError } = await SyntraApp.sb.from("students").insert([{
+                    name: lead.name,
                     phone: lead.phone,
-                    group_id: document.getElementById("convertGroupId").value || null,
                     workspace_id: workspaceContext.workspace.id
-                }]);
+                }]).select();
 
-                if (insertError) {
-                    SyntraApp.showToast("Conversion failed", SyntraApp.parseError(insertError), "error");
+                if (studentError) {
+                    SyntraApp.showToast("Student creation failed", SyntraApp.parseError(studentError), "error");
                     SyntraApp.setButtonLoading(convertBtn, false);
                     return;
                 }
 
-                const { error: updateError } = await SyntraApp.sb.from("leads").update({ status: "enrolled" }).eq("id", lead.id);
-                if (updateError) {
-                    SyntraApp.showToast("Lead status warning", "Student created, but the lead status was not updated.", "error");
-                } else {
-                    SyntraApp.showToast("Lead converted", "A new student record has been created.");
+                const newStudentId = studentData[0].id;
+
+                // 2. Assign to Group if selected
+                if (selectedConvertGroupId) {
+                    await SyntraApp.sb.from("group_students").insert([{
+                        student_id: newStudentId,
+                        group_id: selectedConvertGroupId,
+                        workspace_id: workspaceContext.workspace.id,
+                        status: "active"
+                    }]);
                 }
 
+                // 3. Delete Lead
+                await SyntraApp.sb.from("leads").delete().eq("id", leadId);
+
+                SyntraApp.showToast("Lead converted", "Student created and lead record removed.");
                 SyntraApp.closeModal("convertModal");
                 SyntraApp.setButtonLoading(convertBtn, false);
                 refreshData();
