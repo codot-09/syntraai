@@ -120,24 +120,14 @@
             document.getElementById("studentsShortcut").href = SyntraApp.withWorkspace("students.html", workspace.slug);
             document.getElementById("leadsShortcut").href = SyntraApp.withWorkspace("leads.html", workspace.slug);
 
-            document.getElementById("heroKpis").innerHTML = SyntraApp.loadingState("Preparing snapshot", "We are aggregating workspace metrics.");
-            document.getElementById("statsGrid").innerHTML = [
-                SyntraApp.statCard("Groups", "0", "No data yet"),
-                SyntraApp.statCard("Students", "0", "No data yet"),
-                SyntraApp.statCard("Leads", "0", "No data yet"),
-                SyntraApp.statCard("Revenue", "0 so'm", "No data yet")
-            ].join("");
+            document.getElementById("heroKpis").innerHTML = SyntraApp.loadingState("Preparing snapshot", "Aggregating metrics...");
 
             const [groupsRes, studentsRes, leadsRes, paymentsRes] = await Promise.all([
-                SyntraApp.sb.from("groups").select("*").eq("workspace_id", workspace.id).order("created_at", { ascending: false }),
-                SyntraApp.sb.from("students").select("*, groups(name)").eq("workspace_id", workspace.id).order("created_at", { ascending: false }),
-                SyntraApp.sb.from("leads").select("*").eq("workspace_id", workspace.id).order("created_at", { ascending: false }),
-                SyntraApp.sb.from("payments").select("*, students(full_name)").eq("workspace_id", workspace.id).order("created_at", { ascending: false })
+                SyntraApp.sb.from("groups").select("*").eq("workspace_id", workspace.id),
+                SyntraApp.sb.from("students").select("*, group_students(group_id)").eq("workspace_id", workspace.id),
+                SyntraApp.sb.from("leads").select("*").eq("workspace_id", workspace.id),
+                SyntraApp.sb.from("payments").select("*, students(name)").eq("workspace_id", workspace.id).order("created_at", { ascending: false })
             ]);
-
-            if (groupsRes.error || studentsRes.error || leadsRes.error || paymentsRes.error) {
-                SyntraApp.showToast("Dashboard error", "Some workspace data could not be loaded.", "error");
-            }
 
             const groups = groupsRes.data || [];
             const students = studentsRes.data || [];
@@ -145,117 +135,106 @@
             const payments = paymentsRes.data || [];
 
             const totalRevenue = payments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+            const mStart = monthStart();
             const monthRevenue = payments
-                .filter((item) => item.created_at && new Date(item.created_at) >= monthStart())
+                .filter(p => p.created_at && new Date(p.created_at) >= mStart)
                 .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-            const openLeads = leads.filter((item) => item.status !== "Yopildi").length;
-            const convertedLeads = leads.filter((item) => item.status === "Yopildi").length;
+
+            const activeLeads = leads.filter(l => ["new", "contacted"].includes(String(l.status).toLowerCase())).length;
             const avgTicket = payments.length ? Math.round(totalRevenue / payments.length) : 0;
-            const avgGroupPrice = groups.length
-                ? Math.round(groups.reduce((sum, item) => sum + Number(item.price || 0), 0) / groups.length)
-                : 0;
-            const studentCountByGroup = students.reduce((acc, student) => {
-                const key = student.group_id || "ungrouped";
-                acc[key] = (acc[key] || 0) + 1;
+
+            const groupStudentCounts = students.reduce((acc, s) => {
+                s.group_students?.forEach(gs => {
+                    acc[gs.group_id] = (acc[gs.group_id] || 0) + 1;
+                });
                 return acc;
             }, {});
 
             document.getElementById("heroKpis").innerHTML = `
                 <div class="mini-card">
                     <div class="metric-label">Revenue this month</div>
-                    <div class="metric-value">${SyntraApp.escapeHtml(SyntraApp.formatMoney(monthRevenue))}</div>
-                    <div class="metric-meta">Based on ${payments.length} recorded transactions.</div>
+                    <div class="metric-value">${SyntraApp.formatMoney(monthRevenue)}</div>
+                    <div class="metric-meta">From ${payments.filter(p => new Date(p.created_at) >= mStart).length} recent transactions.</div>
                 </div>
                 <div class="mini-card">
-                    <div class="metric-label">Open leads</div>
-                    <div class="metric-value">${openLeads}</div>
-                    <div class="metric-meta">${convertedLeads} leads already converted or closed.</div>
+                    <div class="metric-label">Active leads</div>
+                    <div class="metric-value">${activeLeads}</div>
+                    <div class="metric-meta">Requires immediate attention.</div>
                 </div>
             `;
 
             document.getElementById("statsGrid").innerHTML = [
-                SyntraApp.statCard("Active groups", String(groups.length), `${avgGroupPrice ? `${SyntraApp.formatMoney(avgGroupPrice)} average price` : "Add your first group"}`),
-                SyntraApp.statCard("Students", String(students.length), `${Object.keys(studentCountByGroup).length || 0} groups currently populated`),
-                SyntraApp.statCard("Lead pipeline", String(leads.length), `${openLeads} still need follow-up`),
-                SyntraApp.statCard("Total revenue", SyntraApp.formatMoney(totalRevenue), `${SyntraApp.formatMoney(avgTicket)} average payment`)
+                SyntraApp.statCard("Groups", String(groups.length), "Total active groups"),
+                SyntraApp.statCard("Students", String(students.length), "Enrolled student records"),
+                SyntraApp.statCard("Pipeline", String(leads.length), "Total acquisition volume"),
+                SyntraApp.statCard("Total revenue", SyntraApp.formatMoney(totalRevenue), `${SyntraApp.formatMoney(avgTicket)} avg. payment`)
             ].join("");
 
-            const recentPayments = document.getElementById("recentPayments");
+            const paymentContainer = document.getElementById("recentPayments");
             if (!payments.length) {
-                recentPayments.innerHTML = SyntraApp.emptyState("No payments yet", "Record your first payment to start tracking revenue.");
+                paymentContainer.innerHTML = SyntraApp.emptyState("No payments", "Finance trail is empty.");
             } else {
-                recentPayments.innerHTML = `<div class="list-stack">
-                    ${recent(payments).map((payment) => `
+                paymentContainer.innerHTML = `<div class="list-stack">
+                    ${recent(payments).map(p => `
                         <div class="list-item">
                             <div>
-                                <div class="list-title">${SyntraApp.escapeHtml(payment.students?.full_name || "Unknown student")}</div>
-                                <div class="list-meta">${SyntraApp.escapeHtml(SyntraApp.formatDate(payment.created_at))}</div>
+                                <div class="list-title">${SyntraApp.escapeHtml(p.students?.name || "Unknown")}</div>
+                                <div class="list-meta">${SyntraApp.formatDate(p.created_at)}</div>
                             </div>
-                            <div class="value-positive">${SyntraApp.escapeHtml(SyntraApp.formatMoney(payment.amount))}</div>
+                            <div class="value-positive">${SyntraApp.formatMoney(p.amount)}</div>
                         </div>
                     `).join("")}
                 </div>`;
             }
 
             const leadBreakdown = document.getElementById("leadBreakdown");
-            const statuses = [
-                { label: "New", key: "Yangi", className: "badge-primary" },
-                { label: "Contacted", key: "Suhbatda", className: "badge-warning" },
-                { label: "Closed", key: "Yopildi", className: "badge-success" }
-            ];
             if (!leads.length) {
-                leadBreakdown.innerHTML = SyntraApp.emptyState("Lead funnel is empty", "Add leads to start tracking acquisition performance.");
+                leadBreakdown.innerHTML = SyntraApp.emptyState("No leads", "Acquisition channel is quiet.");
             } else {
-                leadBreakdown.innerHTML = `
-                    <div class="list-stack">
-                        ${statuses.map((status) => `
-                            <div class="list-item">
-                                <div>
-                                    <div class="list-title">${status.label}</div>
-                                    <div class="list-meta">Current count inside this stage.</div>
-                                </div>
-                                <span class="badge ${status.className}">${leads.filter((lead) => lead.status === status.key).length}</span>
-                            </div>
-                        `).join("")}
-                    </div>
-                `;
-            }
-
-            const groupHealth = document.getElementById("groupHealth");
-            if (!groups.length) {
-                groupHealth.innerHTML = SyntraApp.emptyState("No groups configured", "Create groups to organize students and pricing.");
-            } else {
-                groupHealth.innerHTML = `<div class="list-stack">
-                    ${groups.slice(0, 6).map((group) => `
+                const stages = [
+                    { l: "New", k: "new", c: "badge-primary" },
+                    { l: "Contacted", k: "contacted", c: "badge-warning" },
+                    { l: "Enrolled", k: "enrolled", c: "badge-success" }
+                ];
+                leadBreakdown.innerHTML = `<div class="list-stack">
+                    ${stages.map(s => `
                         <div class="list-item">
-                            <div>
-                                <div class="list-title">${SyntraApp.escapeHtml(group.name)}</div>
-                                <div class="list-meta">${SyntraApp.escapeHtml(group.schedule || "Schedule not set")}</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div class="cell-primary">${studentCountByGroup[group.id] || 0} students</div>
-                                <div class="list-meta">${SyntraApp.escapeHtml(SyntraApp.formatMoney(group.price || 0))}</div>
-                            </div>
+                            <div class="list-title">${s.l}</div>
+                            <span class="badge ${s.c}">${leads.filter(l => String(l.status).toLowerCase() === s.k).length}</span>
                         </div>
                     `).join("")}
                 </div>`;
             }
 
-            const actionQueue = document.getElementById("actionQueue");
-            const actions = [];
-            if (openLeads > 0) actions.push(["Follow up open leads", `${openLeads} leads still need action`, SyntraApp.withWorkspace("leads.html", workspace.slug)]);
-            if (students.length === 0) actions.push(["Add your first student", "Start building your student base", SyntraApp.withWorkspace("students.html", workspace.slug)]);
-            if (groups.length === 0) actions.push(["Create learning groups", "Set up structure for operations and pricing", SyntraApp.withWorkspace("groups.html", workspace.slug)]);
-            if (payments.length === 0) actions.push(["Record payments", "Start your finance tracking", SyntraApp.withWorkspace("payment.html", workspace.slug)]);
-            if (!actions.length) actions.push(["Workspace looks healthy", "Your core operating data is already in place.", SyntraApp.withWorkspace("dashboard.html", workspace.slug)]);
+            const groupHealth = document.getElementById("groupHealth");
+            if (!groups.length) {
+                groupHealth.innerHTML = SyntraApp.emptyState("No groups", "Operation structure needed.");
+            } else {
+                groupHealth.innerHTML = `<div class="list-stack">
+                    ${groups.slice(0, 5).map(g => `
+                        <div class="list-item">
+                            <div>
+                                <div class="list-title">${SyntraApp.escapeHtml(g.name)}</div>
+                                <div class="list-meta">${SyntraApp.escapeHtml(g.schedule || "No schedule")}</div>
+                            </div>
+                            <div class="cell-primary">${groupStudentCounts[g.id] || 0} students</div>
+                        </div>
+                    `).join("")}
+                </div>`;
+            }
 
-            actionQueue.innerHTML = actions.map(([title, meta, href]) => `
-                <a class="list-item" href="${href}">
+            const actions = [];
+            if (activeLeads > 0) actions.push(["Follow up leads", `${activeLeads} prospects waiting`, "leads.html"]);
+            if (students.length > 0 && payments.length === 0) actions.push(["Record payments", "Collect pending tuition", "payment.html"]);
+            if (groups.length === 0) actions.push(["Define groups", "Create learning structure", "groups.html"]);
+            
+            document.getElementById("actionQueue").innerHTML = (actions.length ? actions : [["All caught up", "Operational workflow is clear", "dashboard.html"]]).map(a => `
+                <a class="list-item" href="${SyntraApp.withWorkspace(a[2], workspace.slug)}">
                     <div>
-                        <div class="list-title">${SyntraApp.escapeHtml(title)}</div>
-                        <div class="list-meta">${SyntraApp.escapeHtml(meta)}</div>
+                        <div class="list-title">${a[0]}</div>
+                        <div class="list-meta">${a[1]}</div>
                     </div>
-                    <span class="badge badge-primary">Open</span>
+                    <span class="badge badge-primary">Go</span>
                 </a>
             `).join("");
         });
