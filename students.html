@@ -108,9 +108,9 @@
         const initialGroupFilter = params.get("group");
 
         function renderStats() {
-            const assignedStudents = allStudents.filter((student) => student.group_id).length;
+            const assignedStudents = allStudents.filter((student) => student.group_students?.length > 0).length;
             const unassignedStudents = allStudents.length - assignedStudents;
-            const activeGroups = new Set(allStudents.map((student) => student.group_id).filter(Boolean)).size;
+            const activeGroups = new Set(allStudents.flatMap(s => s.group_students?.map(gs => gs.group_id) || []).filter(Boolean)).size;
 
             document.getElementById("statsGrid").innerHTML = [
                 SyntraApp.statCard("Total students", String(allStudents.length), "All active student records"),
@@ -166,9 +166,15 @@
             const groupFilter = document.getElementById("groupFilter").value;
 
             return allStudents.filter((student) => {
-                const haystack = `${student.full_name || ""} ${student.phone || ""} ${student.groups?.name || ""}`.toLowerCase();
+                const groupName = student.group_students?.[0]?.groups?.name || "";
+                const haystack = `${student.name || ""} ${student.phone || ""} ${groupName}`.toLowerCase();
                 const matchesSearch = haystack.includes(term);
-                const matchesGroup = groupFilter === "all" ? true : student.group_id === groupFilter;
+                
+                let matchesGroup = true;
+                if (groupFilter !== "all") {
+                    matchesGroup = student.group_students?.some(gs => gs.group_id === groupFilter);
+                }
+                
                 return matchesSearch && matchesGroup;
             });
         }
@@ -194,11 +200,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${filtered.map((student) => `
+                        ${filtered.map((student) => {
+                            const groupName = student.group_students?.[0]?.groups?.name || "No group";
+                            return `
                             <tr>
-                                <td class="cell-primary">${SyntraApp.escapeHtml(student.full_name || "")}</td>
+                                <td class="cell-primary">${SyntraApp.escapeHtml(student.name || "")}</td>
                                 <td>${SyntraApp.escapeHtml(student.phone || "")}</td>
-                                <td><span class="badge badge-primary">${SyntraApp.escapeHtml(student.groups?.name || "No group")}</span></td>
+                                <td><span class="badge badge-primary">${SyntraApp.escapeHtml(groupName)}</span></td>
                                 <td>${SyntraApp.escapeHtml(SyntraApp.formatDate(student.created_at))}</td>
                                 <td>
                                     <div class="table-actions">
@@ -207,7 +215,7 @@
                                     </div>
                                 </td>
                             </tr>
-                        `).join("")}
+                        `}).join("")}
                     </tbody>
                 </table>
             `;
@@ -224,7 +232,7 @@
 
         async function refreshData() {
             const [studentsRes, groupsRes] = await Promise.all([
-                SyntraApp.sb.from("students").select("*, groups(name)").eq("workspace_id", workspaceContext.workspace.id).order("created_at", { ascending: false }),
+                SyntraApp.sb.from("students").select("*, group_students(group_id, groups(name))").eq("workspace_id", workspaceContext.workspace.id).order("created_at", { ascending: false }),
                 SyntraApp.sb.from("groups").select("id, name, schedule").eq("workspace_id", workspaceContext.workspace.id).order("name", { ascending: true })
             ]);
 
@@ -243,7 +251,7 @@
             document.getElementById("studentId").value = student.id;
             document.getElementById("studentName").value = student.name || "";
             document.getElementById("studentPhone").value = student.phone || "";
-            selectedStudentGroupId = student.group_id || "";
+            selectedStudentGroupId = student.group_students?.[0]?.group_id || "";
             document.getElementById("studentGroupSearch").value = "";
             document.getElementById("modalTitle").textContent = "Edit student";
             renderStudentGroupChooser();
@@ -257,7 +265,6 @@
                 SyntraApp.showToast("Delete failed", SyntraApp.parseError(error), "error");
                 return;
             }
-
             SyntraApp.showToast("Student deleted", "The record has been removed.");
             refreshData();
         };
@@ -265,13 +272,6 @@
         window.addEventListener("load", async () => {
             workspaceContext = await SyntraApp.requireWorkspace("students");
             if (!workspaceContext) return;
-
-            document.getElementById("statsGrid").innerHTML = [
-                SyntraApp.statCard("Total students", "0", "Loading"),
-                SyntraApp.statCard("Assigned", "0", "Loading"),
-                SyntraApp.statCard("Groups in use", "0", "Loading"),
-                SyntraApp.statCard("New this month", "0", "Loading")
-            ].join("");
 
             document.getElementById("newStudentBtn").addEventListener("click", () => {
                 resetForm();
@@ -289,7 +289,7 @@
                     currentFilteredStudents().map((student) => [
                         student.name || "",
                         student.phone || "",
-                        student.groups?.name || "No group",
+                        student.group_students?.[0]?.groups?.name || "No group",
                         SyntraApp.formatDate(student.created_at)
                     ])
                 );
@@ -301,22 +301,42 @@
                 SyntraApp.setButtonLoading(saveBtn, true, "Saving...");
 
                 const id = document.getElementById("studentId").value;
-                const payload = {
+                const studentPayload = {
                     name: document.getElementById("studentName").value.trim(),
                     phone: document.getElementById("studentPhone").value.trim(),
-                    group_id: selectedStudentGroupId || null,
                     workspace_id: workspaceContext.workspace.id
                 };
 
-                const query = id
-                    ? SyntraApp.sb.from("students").update(payload).eq("id", id)
-                    : SyntraApp.sb.from("students").insert([payload]);
-                const { error } = await query;
+                let studentId = id;
+                if (id) {
+                    const { error } = await SyntraApp.sb.from("students").update(studentPayload).eq("id", id);
+                    if (error) {
+                        SyntraApp.showToast("Update failed", SyntraApp.parseError(error), "error");
+                        SyntraApp.setButtonLoading(saveBtn, false);
+                        return;
+                    }
+                } else {
+                    const { data, error } = await SyntraApp.sb.from("students").insert([studentPayload]).select();
+                    if (error) {
+                        SyntraApp.showToast("Insert failed", SyntraApp.parseError(error), "error");
+                        SyntraApp.setButtonLoading(saveBtn, false);
+                        return;
+                    }
+                    studentId = data[0].id;
+                }
 
-                if (error) {
-                    SyntraApp.showToast("Save failed", SyntraApp.parseError(error), "error");
-                    SyntraApp.setButtonLoading(saveBtn, false);
-                    return;
+                await SyntraApp.sb.from("group_students").delete().eq("student_id", studentId);
+
+                if (selectedStudentGroupId) {
+                    const { error: groupError } = await SyntraApp.sb.from("group_students").insert([{
+                        student_id: studentId,
+                        group_id: selectedStudentGroupId,
+                        workspace_id: workspaceContext.workspace.id,
+                        status: "active"
+                    }]);
+                    if (groupError) {
+                        SyntraApp.showToast("Group assignment failed", SyntraApp.parseError(groupError), "error");
+                    }
                 }
 
                 SyntraApp.showToast(id ? "Student updated" : "Student added", "Student data saved successfully.");
