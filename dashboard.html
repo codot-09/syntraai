@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uz">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,6 +9,39 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/app.css">
+    <style>
+        .chatbot-trigger {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+            z-index: 1000;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: none;
+        }
+        .chatbot-trigger:hover {
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 12px 32px rgba(99, 102, 241, 0.4);
+        }
+        .chatbot-trigger svg {
+            width: 24px;
+            height: 24px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+    </style>
 </head>
 <body>
     <div class="app-grid"></div>
@@ -57,7 +90,7 @@
                         <div class="panel-header">
                             <div>
                                 <div class="panel-title">Recent payments</div>
-                                <div class="panel-subtitle">Latest completed transactions across the workspace.</div>
+                                <div class="panel-subtitle">Latest completed transactions.</div>
                             </div>
                         </div>
                         <div id="recentPayments"></div>
@@ -67,7 +100,7 @@
                         <div class="panel-header">
                             <div>
                                 <div class="panel-title">Lead pipeline</div>
-                                <div class="panel-subtitle">Keep momentum high by moving prospects through the funnel.</div>
+                                <div class="panel-subtitle">Funnel momentum and conversion.</div>
                             </div>
                         </div>
                         <div id="leadBreakdown"></div>
@@ -79,7 +112,7 @@
                         <div class="panel-header">
                             <div>
                                 <div class="panel-title">Group performance</div>
-                                <div class="panel-subtitle">Student load and pricing across current groups.</div>
+                                <div class="panel-subtitle">Student load across current groups.</div>
                             </div>
                         </div>
                         <div id="groupHealth"></div>
@@ -89,7 +122,7 @@
                         <div class="panel-header">
                             <div>
                                 <div class="panel-title">Action queue</div>
-                                <div class="panel-subtitle">The most valuable next steps for your team today.</div>
+                                <div class="panel-subtitle">The most valuable next steps today.</div>
                             </div>
                         </div>
                         <div id="actionQueue" class="list-stack"></div>
@@ -98,6 +131,10 @@
             </div>
         </div>
     </div>
+
+    <button class="chatbot-trigger" id="chatbotTrigger" title="AI Assistant">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+    </button>
 
     <script src="assets/app.js"></script>
     <script>
@@ -116,12 +153,16 @@
 
             const { workspace } = context;
 
+            document.getElementById("chatbotTrigger").addEventListener("click", () => {
+                SyntraApp.showToast("SyntraAI Assistant", "AI Chatbot feature is coming soon!", "info");
+            });
+
             document.getElementById("groupsShortcut").href = SyntraApp.withWorkspace("groups.html", workspace.slug);
             document.getElementById("paymentsShortcut").href = SyntraApp.withWorkspace("payment.html", workspace.slug);
             document.getElementById("studentsShortcut").href = SyntraApp.withWorkspace("students.html", workspace.slug);
             document.getElementById("leadsShortcut").href = SyntraApp.withWorkspace("leads.html", workspace.slug);
 
-            document.getElementById("heroKpis").innerHTML = SyntraApp.loadingState("Preparing snapshot", "Aggregating metrics...");
+            document.getElementById("heroKpis").innerHTML = SyntraApp.loadingState("Syncing", "Fetching metrics...");
 
             const [groupsRes, studentsRes, leadsRes, paymentsRes] = await Promise.all([
                 SyntraApp.sb.from("groups").select("*").eq("workspace_id", workspace.id),
@@ -142,12 +183,8 @@
                 .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
             const activeLeads = leads.filter(l => ["new", "contacted"].includes(String(l.status).toLowerCase())).length;
-            const avgTicket = payments.length ? Math.round(totalRevenue / payments.length) : 0;
-
             const groupStudentCounts = students.reduce((acc, s) => {
-                s.group_students?.forEach(gs => {
-                    acc[gs.group_id] = (acc[gs.group_id] || 0) + 1;
-                });
+                s.group_students?.forEach(gs => { acc[gs.group_id] = (acc[gs.group_id] || 0) + 1; });
                 return acc;
             }, {});
 
@@ -155,27 +192,22 @@
                 <div class="mini-card">
                     <div class="metric-label">Revenue this month</div>
                     <div class="metric-value">${SyntraApp.formatMoney(monthRevenue)}</div>
-                    <div class="metric-meta">From ${payments.filter(p => new Date(p.created_at) >= mStart).length} recent transactions.</div>
                 </div>
                 <div class="mini-card">
                     <div class="metric-label">Active leads</div>
                     <div class="metric-value">${activeLeads}</div>
-                    <div class="metric-meta">Requires immediate attention.</div>
                 </div>
             `;
 
             document.getElementById("statsGrid").innerHTML = [
-                SyntraApp.statCard("Groups", String(groups.length), "Total active groups"),
-                SyntraApp.statCard("Students", String(students.length), "Enrolled student records"),
-                SyntraApp.statCard("Pipeline", String(leads.length), "Total acquisition volume"),
-                SyntraApp.statCard("Total revenue", SyntraApp.formatMoney(totalRevenue), `${SyntraApp.formatMoney(avgTicket)} avg. payment`)
+                SyntraApp.statCard("Groups", String(groups.length), "Active groups"),
+                SyntraApp.statCard("Students", String(students.length), "Total enrollment"),
+                SyntraApp.statCard("Pipeline", String(leads.length), "Lead volume"),
+                SyntraApp.statCard("Total revenue", SyntraApp.formatMoney(totalRevenue), "Gross earnings")
             ].join("");
 
-            const paymentContainer = document.getElementById("recentPayments");
-            if (!payments.length) {
-                paymentContainer.innerHTML = SyntraApp.emptyState("No payments", "Finance trail is empty.");
-            } else {
-                paymentContainer.innerHTML = `<div class="list-stack">
+            document.getElementById("recentPayments").innerHTML = payments.length ? `
+                <div class="list-stack">
                     ${recent(payments).map(p => `
                         <div class="list-item">
                             <div>
@@ -185,33 +217,25 @@
                             <div class="value-positive">${SyntraApp.formatMoney(p.amount)}</div>
                         </div>
                     `).join("")}
-                </div>`;
-            }
+                </div>` : SyntraApp.emptyState("No payments", "Finance trail is empty.");
 
-            const leadBreakdown = document.getElementById("leadBreakdown");
-            if (!leads.length) {
-                leadBreakdown.innerHTML = SyntraApp.emptyState("No leads", "Acquisition channel is quiet.");
-            } else {
-                const stages = [
-                    { l: "New", k: "new", c: "badge-primary" },
-                    { l: "Contacted", k: "contacted", c: "badge-warning" },
-                    { l: "Enrolled", k: "enrolled", c: "badge-success" }
-                ];
-                leadBreakdown.innerHTML = `<div class="list-stack">
+            const stages = [
+                { l: "New", k: "new", c: "badge-primary" },
+                { l: "Contacted", k: "contacted", c: "badge-warning" },
+                { l: "Enrolled", k: "enrolled", c: "badge-success" }
+            ];
+            document.getElementById("leadBreakdown").innerHTML = leads.length ? `
+                <div class="list-stack">
                     ${stages.map(s => `
                         <div class="list-item">
                             <div class="list-title">${s.l}</div>
                             <span class="badge ${s.c}">${leads.filter(l => String(l.status).toLowerCase() === s.k).length}</span>
                         </div>
                     `).join("")}
-                </div>`;
-            }
+                </div>` : SyntraApp.emptyState("No leads", "No activity.");
 
-            const groupHealth = document.getElementById("groupHealth");
-            if (!groups.length) {
-                groupHealth.innerHTML = SyntraApp.emptyState("No groups", "Operation structure needed.");
-            } else {
-                groupHealth.innerHTML = `<div class="list-stack">
+            document.getElementById("groupHealth").innerHTML = groups.length ? `
+                <div class="list-stack">
                     ${groups.slice(0, 5).map(g => `
                         <div class="list-item">
                             <div>
@@ -221,15 +245,13 @@
                             <div class="cell-primary">${groupStudentCounts[g.id] || 0} students</div>
                         </div>
                     `).join("")}
-                </div>`;
-            }
+                </div>` : SyntraApp.emptyState("No groups", "Structure needed.");
 
             const actions = [];
-            if (activeLeads > 0) actions.push(["Follow up leads", `${activeLeads} prospects waiting`, "leads.html"]);
-            if (students.length > 0 && payments.length === 0) actions.push(["Record payments", "Collect pending tuition", "payment.html"]);
+            if (activeLeads > 0) actions.push(["Follow up leads", `${activeLeads} waiting`, "leads.html"]);
             if (groups.length === 0) actions.push(["Define groups", "Create learning structure", "groups.html"]);
             
-            document.getElementById("actionQueue").innerHTML = (actions.length ? actions : [["All caught up", "Operational workflow is clear", "dashboard.html"]]).map(a => `
+            document.getElementById("actionQueue").innerHTML = (actions.length ? actions : [["All caught up", "No urgent tasks", "dashboard.html"]]).map(a => `
                 <a class="list-item" href="${SyntraApp.withWorkspace(a[2], workspace.slug)}">
                     <div>
                         <div class="list-title">${a[0]}</div>
