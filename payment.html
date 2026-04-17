@@ -103,7 +103,7 @@
             return new Date(now.getFullYear(), now.getMonth(), 1);
         }
 
-        function fillStudentFilters() {
+        function fillFilters() {
             const filter = document.getElementById("studentFilter");
             const options = students.map((student) => `
                 <option value="${student.id}">${SyntraApp.escapeHtml(student.name)}</option>
@@ -146,25 +146,28 @@
             const monthlyRevenue = payments
                 .filter((payment) => payment.created_at && new Date(payment.created_at) >= monthStart())
                 .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-            const avgPayment = payments.length ? Math.round(totalRevenue / payments.length) : 0;
 
             document.getElementById("statsGrid").innerHTML = [
-                SyntraApp.statCard("Total revenue", SyntraApp.formatMoney(totalRevenue), `${payments.length} recorded transactions`),
-                SyntraApp.statCard("Revenue this month", SyntraApp.formatMoney(monthlyRevenue), "Current calendar month"),
-                SyntraApp.statCard("Average payment", SyntraApp.formatMoney(avgPayment), "Mean transaction value"),
-                SyntraApp.statCard("Paid students", String(new Set(payments.map((payment) => payment.student_id).filter(Boolean)).size), `${students.length} students in directory`)
+                SyntraApp.statCard("Total revenue", SyntraApp.formatMoney(totalRevenue), `${payments.length} transactions`),
+                SyntraApp.statCard("Revenue this month", SyntraApp.formatMoney(monthlyRevenue), "Current month"),
+                SyntraApp.statCard("Cash payments", SyntraApp.formatMoney(payments.filter(p => p.payment_method === 'cash').reduce((s, p) => s + Number(p.amount), 0)), "Total via cash"),
+                SyntraApp.statCard("Card payments", SyntraApp.formatMoney(payments.filter(p => p.payment_method === 'card').reduce((s, p) => s + Number(p.amount), 0)), "Total via card")
             ].join("");
         }
 
         function filteredPayments() {
             const term = document.getElementById("searchInput").value.trim().toLowerCase();
             const studentFilter = document.getElementById("studentFilter").value;
+            const methodFilter = document.getElementById("methodFilter").value;
+            const statusFilter = document.getElementById("statusFilter").value;
 
             return payments.filter((payment) => {
                 const studentName = payment.students?.name || "";
                 const matchesSearch = studentName.toLowerCase().includes(term);
                 const matchesStudent = studentFilter === "all" ? true : payment.student_id === studentFilter;
-                return matchesSearch && matchesStudent;
+                const matchesMethod = methodFilter === "all" ? true : payment.payment_method === methodFilter;
+                const matchesStatus = statusFilter === "all" ? true : payment.status === statusFilter;
+                return matchesSearch && matchesStudent && matchesMethod && matchesStatus;
             });
         }
 
@@ -173,7 +176,7 @@
             const rows = filteredPayments();
 
             if (!rows.length) {
-                container.innerHTML = SyntraApp.emptyState("No payments found", "Record your first payment or adjust the current filters.");
+                container.innerHTML = SyntraApp.emptyState("No payments found", "Adjust filters or record a payment.");
                 return;
             }
 
@@ -183,6 +186,8 @@
                         <tr>
                             <th>Student</th>
                             <th>Amount</th>
+                            <th>Method</th>
+                            <th>Status</th>
                             <th>Date</th>
                             <th>Actions</th>
                         </tr>
@@ -190,9 +195,11 @@
                     <tbody>
                         ${rows.map((payment) => `
                             <tr>
-                                <td class="cell-primary">${SyntraApp.escapeHtml(payment.students?.name || "Unknown student")}</td>
-                                <td class="value-positive">${SyntraApp.escapeHtml(SyntraApp.formatMoney(payment.amount || 0))}</td>
-                                <td>${SyntraApp.escapeHtml(SyntraApp.formatDate(payment.created_at))}</td>
+                                <td class="cell-primary">${SyntraApp.escapeHtml(payment.students?.name || "Unknown")}</td>
+                                <td class="value-positive">${SyntraApp.formatMoney(payment.amount || 0)}</td>
+                                <td><span class="badge">${SyntraApp.escapeHtml(payment.payment_method || "—")}</span></td>
+                                <td><span class="badge ${payment.status === 'full paid' ? 'badge-success' : 'badge-warning'}">${SyntraApp.escapeHtml(payment.status || "—")}</span></td>
+                                <td>${SyntraApp.formatDate(payment.created_at)}</td>
                                 <td>
                                     <div class="table-actions">
                                         <button class="btn btn-secondary" type="button" onclick="editPayment('${payment.id}')">Edit</button>
@@ -223,7 +230,7 @@
 
             payments = paymentsRes.data || [];
             students = studentsRes.data || [];
-            fillStudentFilters();
+            fillFilters();
             renderStats();
             renderPayments();
         }
@@ -234,6 +241,8 @@
 
             document.getElementById("paymentId").value = payment.id;
             document.getElementById("paymentAmount").value = payment.amount || "";
+            document.getElementById("paymentMethod").value = payment.payment_method || "cash";
+            document.getElementById("paymentStatus").value = payment.status || "full paid";
             selectedPaymentStudentId = payment.student_id || "";
             document.getElementById("studentSearch").value = "";
             document.getElementById("paymentModalTitle").textContent = "Edit payment";
@@ -243,12 +252,7 @@
 
         window.deletePayment = async function deletePayment(id) {
             if (!window.confirm("Delete this payment?")) return;
-            const { error } = await SyntraApp.sb.from("payments").delete().eq("id", id);
-            if (error) {
-                SyntraApp.showToast("Delete failed", SyntraApp.parseError(error), "error");
-                return;
-            }
-            SyntraApp.showToast("Payment deleted", "The transaction has been removed.");
+            await SyntraApp.sb.from("payments").delete().eq("id", id);
             refreshData();
         };
 
@@ -256,7 +260,20 @@
             workspaceContext = await SyntraApp.requireWorkspace("payment");
             if (!workspaceContext) return;
 
-            // Rebuild Form for Student Searching
+            const controls = document.querySelector(".controls");
+            controls.innerHTML += `
+                <select class="select-field" id="methodFilter" style="max-width: 150px;">
+                    <option value="all">All methods</option>
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                </select>
+                <select class="select-field" id="statusFilter" style="max-width: 150px;">
+                    <option value="all">All statuses</option>
+                    <option value="full paid">Full paid</option>
+                    <option value="partial">Partial</option>
+                </select>
+            `;
+
             const form = document.getElementById("paymentForm");
             form.innerHTML = `
                 <input id="paymentId" type="hidden">
@@ -264,69 +281,58 @@
                     <label class="field-label" for="studentSearch">Search student</label>
                     <input class="field" id="studentSearch" type="search" placeholder="Type student name...">
                 </div>
-                <div class="field-group">
-                    <label class="field-label">Select student</label>
-                    <div id="paymentStudentList" class="multi-checkbox-grid" style="max-height: 200px; overflow-y: auto;">Loading...</div>
+                <div id="paymentStudentList" class="multi-checkbox-grid" style="max-height: 150px; overflow-y: auto; margin-bottom: 1rem;"></div>
+                <div class="form-grid two">
+                    <div class="field-group">
+                        <label class="field-label" for="paymentAmount">Amount</label>
+                        <input class="field" id="paymentAmount" type="number" required>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label" for="paymentMethod">Method</label>
+                        <select class="select-field" id="paymentMethod">
+                            <option value="cash">Cash</option>
+                            <option value="card">Card</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="field-group">
-                    <label class="field-label" for="paymentAmount">Amount</label>
-                    <input class="field" id="paymentAmount" type="number" min="0" placeholder="500000" required>
+                    <label class="field-label" for="paymentStatus">Status</label>
+                    <select class="select-field" id="paymentStatus">
+                        <option value="full paid">Full paid</option>
+                        <option value="partial">Partial</option>
+                    </select>
                 </div>
                 <button class="btn btn-primary btn-block" id="savePaymentBtn" type="submit">Save payment</button>
             `;
 
-            document.getElementById("newPaymentBtn").addEventListener("click", () => {
-                resetForm();
-                SyntraApp.openModal("paymentModal");
-            });
-
+            document.getElementById("newPaymentBtn").addEventListener("click", resetForm);
             document.getElementById("searchInput").addEventListener("input", renderPayments);
             document.getElementById("studentFilter").addEventListener("change", renderPayments);
+            document.getElementById("methodFilter").addEventListener("change", renderPayments);
+            document.getElementById("statusFilter").addEventListener("change", renderPayments);
             document.getElementById("studentSearch").addEventListener("input", renderStudentChooser);
-
-            document.getElementById("exportBtn").addEventListener("click", () => {
-                SyntraApp.exportCsv(
-                    "payments.csv",
-                    ["Student", "Amount", "Date"],
-                    filteredPayments().map((payment) => [
-                        payment.students?.name || "",
-                        payment.amount || 0,
-                        SyntraApp.formatDate(payment.created_at)
-                    ])
-                );
-            });
 
             document.getElementById("paymentForm").addEventListener("submit", async (event) => {
                 event.preventDefault();
-                if (!selectedPaymentStudentId) {
-                    SyntraApp.showToast("Selection required", "Please select a student from the list.", "error");
-                    return;
-                }
-
-                const saveBtn = document.getElementById("savePaymentBtn");
-                SyntraApp.setButtonLoading(saveBtn, true, "Saving...");
+                if (!selectedPaymentStudentId) return SyntraApp.showToast("Select student", "Required", "error");
 
                 const id = document.getElementById("paymentId").value;
                 const payload = {
                     student_id: selectedPaymentStudentId,
                     amount: Number(document.getElementById("paymentAmount").value),
+                    payment_method: document.getElementById("paymentMethod").value,
+                    status: document.getElementById("paymentStatus").value,
                     workspace_id: workspaceContext.workspace.id
                 };
 
-                const { error } = id
+                const { error } = id 
                     ? await SyntraApp.sb.from("payments").update(payload).eq("id", id)
                     : await SyntraApp.sb.from("payments").insert([payload]);
 
-                if (error) {
-                    SyntraApp.showToast("Save failed", SyntraApp.parseError(error), "error");
-                    SyntraApp.setButtonLoading(saveBtn, false);
-                    return;
+                if (!error) {
+                    SyntraApp.closeModal("paymentModal");
+                    refreshData();
                 }
-
-                SyntraApp.showToast(id ? "Payment updated" : "Payment recorded", "Finance data has been saved.");
-                SyntraApp.closeModal("paymentModal");
-                SyntraApp.setButtonLoading(saveBtn, false);
-                refreshData();
             });
 
             refreshData();
