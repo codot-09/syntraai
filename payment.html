@@ -113,7 +113,7 @@
 
         function renderStudentChooser() {
             const list = document.getElementById("paymentStudentList");
-            const searchTerm = document.getElementById("studentSearch").value.trim().toLowerCase();
+            const searchTerm = document.getElementById("studentSearch")?.value.trim().toLowerCase() || "";
             const filteredStudents = students.filter((s) => s.name.toLowerCase().includes(searchTerm));
 
             if (!filteredStudents.length) {
@@ -143,8 +143,9 @@
 
         function renderStats() {
             const totalRevenue = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+            const mStart = monthStart();
             const monthlyRevenue = payments
-                .filter((payment) => payment.created_at && new Date(payment.created_at) >= monthStart())
+                .filter((payment) => payment.created_at && new Date(payment.created_at) >= mStart)
                 .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 
             document.getElementById("statsGrid").innerHTML = [
@@ -158,8 +159,8 @@
         function filteredPayments() {
             const term = document.getElementById("searchInput").value.trim().toLowerCase();
             const studentFilter = document.getElementById("studentFilter").value;
-            const methodFilter = document.getElementById("methodFilter").value;
-            const statusFilter = document.getElementById("statusFilter").value;
+            const methodFilter = document.getElementById("methodFilter")?.value || "all";
+            const statusFilter = document.getElementById("statusFilter")?.value || "all";
 
             return payments.filter((payment) => {
                 const studentName = payment.students?.name || "";
@@ -216,7 +217,8 @@
         function resetForm() {
             document.getElementById("paymentForm").reset();
             document.getElementById("paymentId").value = "";
-            document.getElementById("studentSearch").value = "";
+            const searchInput = document.getElementById("studentSearch");
+            if (searchInput) searchInput.value = "";
             selectedPaymentStudentId = "";
             document.getElementById("paymentModalTitle").textContent = "Record payment";
             renderStudentChooser();
@@ -244,7 +246,8 @@
             document.getElementById("paymentMethod").value = payment.payment_method || "cash";
             document.getElementById("paymentStatus").value = payment.status || "full paid";
             selectedPaymentStudentId = payment.student_id || "";
-            document.getElementById("studentSearch").value = "";
+            const searchInput = document.getElementById("studentSearch");
+            if (searchInput) searchInput.value = "";
             document.getElementById("paymentModalTitle").textContent = "Edit payment";
             renderStudentChooser();
             SyntraApp.openModal("paymentModal");
@@ -305,7 +308,11 @@
                 <button class="btn btn-primary btn-block" id="savePaymentBtn" type="submit">Save payment</button>
             `;
 
-            document.getElementById("newPaymentBtn").addEventListener("click", resetForm);
+            document.getElementById("newPaymentBtn").addEventListener("click", () => {
+                resetForm();
+                SyntraApp.openModal("paymentModal");
+            });
+
             document.getElementById("searchInput").addEventListener("input", renderPayments);
             document.getElementById("studentFilter").addEventListener("change", renderPayments);
             document.getElementById("methodFilter").addEventListener("change", renderPayments);
@@ -335,7 +342,7 @@
                 }
             });
 
-            refreshData();
+            await refreshData();
         });
     </script>
 </body>
