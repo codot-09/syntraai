@@ -310,7 +310,7 @@ const SyntraApp = (() => {
         }
 
         const subscribed = workspace.subscribed === false ? false : true;
-        if (!subscribed && pageKey !== "subscription") {
+        if (!subscribed && pageKey !== "subscription" && pageKey !== "dashboard") {
             window.location.href = "subscription.html";
             return null;
         }
