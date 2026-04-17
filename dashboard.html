@@ -117,18 +117,20 @@
             const { workspace } = context;
 
             // --- OBUNA TEKSHIRUVI ---
+            // Faqatgina obuna holati aniq 'true' bo'lmasa, subscription sahifasiga o'tkazadi
             const { data: wsData, error: wsError } = await SyntraApp.sb
                 .from("workspaces")
                 .select("subscription")
                 .eq("id", workspace.id)
                 .single();
 
-            if (wsError || !wsData?.subscription) {
+            if (wsError || wsData?.subscription !== true) {
                 window.location.href = SyntraApp.withWorkspace("subscription.html", workspace.slug);
-                return;
+                return; // Dashboard yuklanishini to'xtatish
             }
             // ------------------------
 
+            // Agar obuna true bo'lsa, pastdagi kodlar odatdagidek ishlaydi
             document.getElementById("groupsShortcut").href = SyntraApp.withWorkspace("groups.html", workspace.slug);
             document.getElementById("paymentsShortcut").href = SyntraApp.withWorkspace("payment.html", workspace.slug);
             document.getElementById("studentsShortcut").href = SyntraApp.withWorkspace("students.html", workspace.slug);
