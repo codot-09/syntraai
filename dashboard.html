@@ -26,25 +26,25 @@
             <header class="topbar">
                 <div class="topbar-left">
                     <h1>Command Center</h1>
-                    <p>Track growth, operations, and finance in one focused view for your workspace.</p>
+                    <p>Workspace o'sishi, operatsiyalar va moliya nazorati.</p>
                 </div>
                 <div class="topbar-actions">
-                    <a class="btn btn-secondary" id="groupsShortcut" href="#">Manage groups</a>
-                    <a class="btn btn-primary" id="paymentsShortcut" href="#">Record payment</a>
+                    <a class="btn btn-secondary" id="groupsShortcut" href="#">Guruhlar</a>
+                    <a class="btn btn-primary" id="paymentsShortcut" href="#">To'lov qo'shish</a>
                 </div>
             </header>
 
             <div class="page-stack">
                 <section class="hero-panel hero-grid">
                     <div>
-                        <div class="eyebrow">Live operating snapshot</div>
-                        <div class="hero-title">Professional visibility across enrollment, learning, and revenue.</div>
+                        <div class="eyebrow">Jonli snapshot</div>
+                        <div class="hero-title">O'quv jarayoni va daromad ko'rinishi.</div>
                         <p class="hero-description">
-                            This workspace is designed to help you act quickly: convert leads, spot weak areas, and keep teaching operations stable.
+                            Ushbu panel tezkor qaror qabul qilish uchun mo'ljallangan: lidlarni konvertatsiya qiling va o'quv sifatini nazorat qiling.
                         </p>
                         <div class="hero-actions">
-                            <a class="btn btn-primary" id="studentsShortcut" href="#">Open students</a>
-                            <a class="btn btn-secondary" id="leadsShortcut" href="#">Review leads</a>
+                            <a class="btn btn-primary" id="studentsShortcut" href="#">O'quvchilar</a>
+                            <a class="btn btn-secondary" id="leadsShortcut" href="#">Lidlar</a>
                         </div>
                     </div>
                     <div class="hero-kpis" id="heroKpis"></div>
@@ -56,8 +56,8 @@
                     <article class="panel">
                         <div class="panel-header">
                             <div>
-                                <div class="panel-title">Recent payments</div>
-                                <div class="panel-subtitle">Latest completed transactions across the workspace.</div>
+                                <div class="panel-title">Oxirgi to'lovlar</div>
+                                <div class="panel-subtitle">Workspace bo'yicha so'nggi tranzaksiyalar.</div>
                             </div>
                         </div>
                         <div id="recentPayments"></div>
@@ -66,8 +66,8 @@
                     <article class="panel">
                         <div class="panel-header">
                             <div>
-                                <div class="panel-title">Lead pipeline</div>
-                                <div class="panel-subtitle">Keep momentum high by moving prospects through the funnel.</div>
+                                <div class="panel-title">Lidlar oqimi</div>
+                                <div class="panel-subtitle">Funnel orqali lidlar harakatini kuzatib boring.</div>
                             </div>
                         </div>
                         <div id="leadBreakdown"></div>
@@ -78,8 +78,8 @@
                     <article class="panel">
                         <div class="panel-header">
                             <div>
-                                <div class="panel-title">Group performance</div>
-                                <div class="panel-subtitle">Student load and pricing across current groups.</div>
+                                <div class="panel-title">Guruhlar holati</div>
+                                <div class="panel-subtitle">Guruhlardagi o'quvchilar soni va yuklama.</div>
                             </div>
                         </div>
                         <div id="groupHealth"></div>
@@ -89,7 +89,7 @@
                         <div class="panel-header">
                             <div>
                                 <div class="panel-title">Action queue</div>
-                                <div class="panel-subtitle">The most valuable next steps for your team today.</div>
+                                <div class="panel-subtitle">Bugun bajarilishi kerak bo'lgan muhim qadamlar.</div>
                             </div>
                         </div>
                         <div id="actionQueue" class="list-stack"></div>
@@ -101,143 +101,141 @@
 
     <script src="assets/app.js"></script>
     <script>
-        function monthStart() {
-            const now = new Date();
-            return new Date(now.getFullYear(), now.getMonth(), 1);
-        }
+        const Dashboard = {
+            utils: {
+                monthStart: () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+                recent: (items, count = 5) => items.slice(0, count)
+            },
 
-        function recent(items, count = 5) {
-            return items.slice(0, count);
-        }
+            async checkSubscription(workspace) {
+                const { data, error } = await SyntraApp.sb
+                    .from("workspaces")
+                    .select("subscription")
+                    .eq("id", workspace.id)
+                    .single();
 
-        window.addEventListener("load", async () => {
-            const context = await SyntraApp.requireWorkspace("dashboard");
-            if (!context) return;
+                if (error || !data?.subscription) {
+                    window.location.href = SyntraApp.withWorkspace("subscription.html", workspace.slug);
+                    return false;
+                }
+                return true;
+            },
 
-            const { workspace } = context;
-            document.getElementById("groupsShortcut").href = SyntraApp.withWorkspace("groups.html", workspace.slug);
-            document.getElementById("paymentsShortcut").href = SyntraApp.withWorkspace("payment.html", workspace.slug);
-            document.getElementById("studentsShortcut").href = SyntraApp.withWorkspace("students.html", workspace.slug);
-            document.getElementById("leadsShortcut").href = SyntraApp.withWorkspace("leads.html", workspace.slug);
+            async init() {
+                const context = await SyntraApp.requireWorkspace("dashboard");
+                if (!context) return;
 
-            document.getElementById("heroKpis").innerHTML = SyntraApp.loadingState("Preparing snapshot", "Aggregating metrics...");
+                const { workspace } = context;
 
-            const [groupsRes, studentsRes, leadsRes, paymentsRes] = await Promise.all([
-                SyntraApp.sb.from("groups").select("*").eq("workspace_id", workspace.id),
-                SyntraApp.sb.from("students").select("*, group_students(group_id)").eq("workspace_id", workspace.id),
-                SyntraApp.sb.from("leads").select("*").eq("workspace_id", workspace.id),
-                SyntraApp.sb.from("payments").select("*, students(name)").eq("workspace_id", workspace.id).order("created_at", { ascending: false })
-            ]);
+                // 1. Obunani tekshirish
+                if (!(await this.checkSubscription(workspace))) return;
 
-            const groups = groupsRes.data || [];
-            const students = studentsRes.data || [];
-            const leads = leadsRes.data || [];
-            const payments = paymentsRes.data || [];
+                // 2. Shortcutlarni yangilash
+                this.updateLinks(workspace);
 
-            const totalRevenue = payments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-            const mStart = monthStart();
-            const monthRevenue = payments
-                .filter(p => p.created_at && new Date(p.created_at) >= mStart)
-                .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+                // 3. Ma'lumotlarni yuklash
+                document.getElementById("heroKpis").innerHTML = SyntraApp.loadingState("Yuklanmoqda...", "Analitika hisoblanmoqda.");
 
-            const activeLeads = leads.filter(l => ["new", "contacted"].includes(String(l.status).toLowerCase())).length;
-            const avgTicket = payments.length ? Math.round(totalRevenue / payments.length) : 0;
+                const [groupsRes, studentsRes, leadsRes, paymentsRes] = await Promise.all([
+                    SyntraApp.sb.from("groups").select("*").eq("workspace_id", workspace.id),
+                    SyntraApp.sb.from("students").select("*, group_students(group_id)").eq("workspace_id", workspace.id),
+                    SyntraApp.sb.from("leads").select("*").eq("workspace_id", workspace.id),
+                    SyntraApp.sb.from("payments").select("*, students(name)").eq("workspace_id", workspace.id).order("created_at", { ascending: false })
+                ]);
 
-            const groupStudentCounts = students.reduce((acc, s) => {
-                s.group_students?.forEach(gs => {
-                    acc[gs.group_id] = (acc[gs.group_id] || 0) + 1;
+                this.render({
+                    groups: groupsRes.data || [],
+                    students: studentsRes.data || [],
+                    leads: leadsRes.data || [],
+                    payments: paymentsRes.data || [],
+                    workspace
                 });
-                return acc;
-            }, {});
+            },
 
-            document.getElementById("heroKpis").innerHTML = `
-                <div class="mini-card">
-                    <div class="metric-label">Revenue this month</div>
-                    <div class="metric-value">${SyntraApp.formatMoney(monthRevenue)}</div>
-                    <div class="metric-meta">From ${payments.filter(p => new Date(p.created_at) >= mStart).length} recent transactions.</div>
-                </div>
-                <div class="mini-card">
-                    <div class="metric-label">Active leads</div>
-                    <div class="metric-value">${activeLeads}</div>
-                    <div class="metric-meta">Requires immediate attention.</div>
-                </div>
-            `;
+            updateLinks(workspace) {
+                const ids = ["groupsShortcut", "paymentsShortcut", "studentsShortcut", "leadsShortcut"];
+                ids.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.href = SyntraApp.withWorkspace(id.replace("Shortcut", ".html"), workspace.slug);
+                });
+            },
 
-            document.getElementById("statsGrid").innerHTML = [
-                SyntraApp.statCard("Groups", String(groups.length), "Total active groups"),
-                SyntraApp.statCard("Students", String(students.length), "Enrolled student records"),
-                SyntraApp.statCard("Pipeline", String(leads.length), "Total acquisition volume"),
-                SyntraApp.statCard("Total revenue", SyntraApp.formatMoney(totalRevenue), `${SyntraApp.formatMoney(avgTicket)} avg. payment`)
-            ].join("");
+            render(data) {
+                const mStart = this.utils.monthStart();
+                const totalRev = data.payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+                const monthRev = data.payments.filter(p => new Date(p.created_at) >= mStart).reduce((s, p) => s + Number(p.amount || 0), 0);
+                const activeLeads = data.leads.filter(l => ["new", "contacted"].includes(String(l.status).toLowerCase())).length;
+                
+                const groupCounts = data.students.reduce((acc, s) => {
+                    s.group_students?.forEach(gs => acc[gs.group_id] = (acc[gs.group_id] || 0) + 1);
+                    return acc;
+                }, {});
 
-            const paymentContainer = document.getElementById("recentPayments");
-            if (!payments.length) {
-                paymentContainer.innerHTML = SyntraApp.emptyState("No payments", "Finance trail is empty.");
-            } else {
-                paymentContainer.innerHTML = `<div class="list-stack">
-                    ${recent(payments).map(p => `
+                // Hero KPIs
+                document.getElementById("heroKpis").innerHTML = `
+                    <div class="mini-card">
+                        <div class="metric-label">Shu oy daromad</div>
+                        <div class="metric-value">${SyntraApp.formatMoney(monthRev)}</div>
+                        <div class="metric-meta">Oydagi jami tranzaksiyalar: ${data.payments.filter(p => new Date(p.created_at) >= mStart).length}</div>
+                    </div>
+                    <div class="mini-card">
+                        <div class="metric-label">Faol lidlar</div>
+                        <div class="metric-value">${activeLeads}</div>
+                        <div class="metric-meta">Bog'lanish kutilmoqda.</div>
+                    </div>
+                `;
+
+                // Stats Grid
+                document.getElementById("statsGrid").innerHTML = [
+                    SyntraApp.statCard("Guruhlar", String(data.groups.length), "Faol o'quv guruhlari"),
+                    SyntraApp.statCard("Studentlar", String(data.students.length), "Jami o'quvchilar"),
+                    SyntraApp.statCard("Lidlar", String(data.leads.length), "Pipeline hajmi"),
+                    SyntraApp.statCard("Umumiy tushum", SyntraApp.formatMoney(totalRev), "Jami moliya")
+                ].join("");
+
+                // Recent Payments
+                document.getElementById("recentPayments").innerHTML = data.payments.length 
+                    ? `<div class="list-stack">${this.utils.recent(data.payments).map(p => `
                         <div class="list-item">
-                            <div>
-                                <div class="list-title">${SyntraApp.escapeHtml(p.students?.name || "Unknown")}</div>
-                                <div class="list-meta">${SyntraApp.formatDate(p.created_at)}</div>
-                            </div>
+                            <div><div class="list-title">${SyntraApp.escapeHtml(p.students?.name || "Noma'lum")}</div><div class="list-meta">${SyntraApp.formatDate(p.created_at)}</div></div>
                             <div class="value-positive">${SyntraApp.formatMoney(p.amount)}</div>
-                        </div>
-                    `).join("")}
-                </div>`;
-            }
+                        </div>`).join("")}</div>`
+                    : SyntraApp.emptyState("To'lovlar yo'q", "Hali tranzaksiya mavjud emas.");
 
-            const leadBreakdown = document.getElementById("leadBreakdown");
-            if (!leads.length) {
-                leadBreakdown.innerHTML = SyntraApp.emptyState("No leads", "Acquisition channel is quiet.");
-            } else {
-                const stages = [
-                    { l: "New", k: "new", c: "badge-primary" },
-                    { l: "Contacted", k: "contacted", c: "badge-warning" },
-                    { l: "Enrolled", k: "enrolled", c: "badge-success" }
-                ];
-                leadBreakdown.innerHTML = `<div class="list-stack">
-                    ${stages.map(s => `
+                // Leads Breakdown
+                const stages = [{l:"Yangi",k:"new",c:"badge-primary"}, {l:"Suhbatda",k:"contacted",c:"badge-warning"}, {l:"A'zo bo'ldi",k:"enrolled",c:"badge-success"}];
+                document.getElementById("leadBreakdown").innerHTML = data.leads.length 
+                    ? `<div class="list-stack">${stages.map(s => `
                         <div class="list-item">
                             <div class="list-title">${s.l}</div>
-                            <span class="badge ${s.c}">${leads.filter(l => String(l.status).toLowerCase() === s.k).length}</span>
-                        </div>
-                    `).join("")}
-                </div>`;
-            }
+                            <span class="badge ${s.c}">${data.leads.filter(l => String(l.status).toLowerCase() === s.k).length}</span>
+                        </div>`).join("")}</div>`
+                    : SyntraApp.emptyState("Lidlar mavjud emas", "Pipeline hozircha bo'sh.");
 
-            const groupHealth = document.getElementById("groupHealth");
-            if (!groups.length) {
-                groupHealth.innerHTML = SyntraApp.emptyState("No groups", "Operation structure needed.");
-            } else {
-                groupHealth.innerHTML = `<div class="list-stack">
-                    ${groups.slice(0, 5).map(g => `
+                // Group Health
+                document.getElementById("groupHealth").innerHTML = data.groups.length
+                    ? `<div class="list-stack">${data.groups.slice(0, 5).map(g => `
                         <div class="list-item">
-                            <div>
-                                <div class="list-title">${SyntraApp.escapeHtml(g.name)}</div>
-                                <div class="list-meta">${SyntraApp.escapeHtml(g.schedule || "No schedule")}</div>
-                            </div>
-                            <div class="cell-primary">${groupStudentCounts[g.id] || 0} students</div>
-                        </div>
-                    `).join("")}
-                </div>`;
-            }
+                            <div><div class="list-title">${SyntraApp.escapeHtml(g.name)}</div><div class="list-meta">${SyntraApp.escapeHtml(g.schedule || "Jadval yo'q")}</div></div>
+                            <div class="cell-primary">${groupCounts[g.id] || 0} o'quvchi</div>
+                        </div>`).join("")}</div>`
+                    : SyntraApp.emptyState("Guruhlar yo'q", "Operatsiyalar boshlanmagan.");
 
-            const actions = [];
-            if (activeLeads > 0) actions.push(["Follow up leads", `${activeLeads} prospects waiting`, "leads.html"]);
-            if (students.length > 0 && payments.length === 0) actions.push(["Record payments", "Collect pending tuition", "payment.html"]);
-            if (groups.length === 0) actions.push(["Define groups", "Create learning structure", "groups.html"]);
-            
-            document.getElementById("actionQueue").innerHTML = (actions.length ? actions : [["All caught up", "Operational workflow is clear", "dashboard.html"]]).map(a => `
-                <a class="list-item" href="${SyntraApp.withWorkspace(a[2], workspace.slug)}">
-                    <div>
-                        <div class="list-title">${a[0]}</div>
-                        <div class="list-meta">${a[1]}</div>
-                    </div>
-                    <span class="badge badge-primary">Go</span>
-                </a>
-            `).join("");
-        });
+                // Actions
+                const actions = [];
+                if (activeLeads > 0) actions.push(["Lidlarni konvert qiling", `${activeLeads} lid kutmoqda`, "leads.html"]);
+                if (data.students.length > 0 && data.payments.length === 0) actions.push(["To'lovlarni yozing", "Moliya oqimini boshlang", "payment.html"]);
+                if (data.groups.length === 0) actions.push(["Guruh tuzing", "O'quv rejasini boshlang", "groups.html"]);
+                
+                document.getElementById("actionQueue").innerHTML = (actions.length ? actions : [["Sokinlik", "Barcha ishlar joyida", "dashboard.html"]]).map(a => `
+                    <a class="list-item" href="${SyntraApp.withWorkspace(a[2], data.workspace.slug)}">
+                        <div><div class="list-title">${a[0]}</div><div class="list-meta">${a[1]}</div></div>
+                        <span class="badge badge-primary">Go</span>
+                    </a>`).join("");
+            }
+        };
+
+        window.addEventListener("load", () => Dashboard.init());
     </script>
 </body>
 </html>
