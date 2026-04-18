@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyntraAI | Settings</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/app.css">
+    <style>
+        .char-counter {
+            font-size: 12px;
+            color: var(--text-faint);
+            text-align: right;
+            margin-top: 4px;
+        }
+        .char-counter.warning {
+            color: var(--warning);
+        }
+        .char-counter.error {
+            color: var(--danger);
+        }
+        .workspace-info {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+        }
+        .info-item {
+            padding: 16px;
+            background: var(--bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+        }
+        .info-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-faint);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .info-value {
+            font-size: 14px;
+            color: var(--text);
+            font-weight: 500;
+        }
+        .subscription-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .subscription-badge.active {
+            background: rgba(15, 159, 110, 0.1);
+            color: var(--success);
+        }
+        .subscription-badge.inactive {
+            background: rgba(220, 38, 38, 0.1);
+            color: var(--danger);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-grid"></div>
+    <div class="app-aurora"></div>
+
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar"></aside>
+
+        <div class="content">
+            <div class="mobile-topbar">
+                <button class="btn btn-secondary" id="openSidebar" type="button">Menu</button>
+                <div class="workspace-pill" id="workspaceBadge">Workspace</div>
+            </div>
+
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h1>Workspace Settings</h1>
+                    <p>Manage your workspace information, subscription, and general settings.</p>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-danger" id="deleteWorkspaceBtn" type="button">Delete Workspace</button>
+                </div>
+            </header>
+
+            <div class="page-stack">
+                <section class="workspace-info">
+                    <div class="panel-header" style="margin-bottom: 20px;">
+                        <div>
+                            <div class="panel-title">Current Workspace Information</div>
+                            <div class="panel-subtitle">Overview of your workspace details and status.</div>
+                        </div>
+                    </div>
+                    <div class="info-grid" id="workspaceInfo"></div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <div class="panel-title">Update Workspace</div>
+                            <div class="panel-subtitle">Modify your workspace information and settings.</div>
+                        </div>
+                    </div>
+
+                    <form id="workspaceForm" class="form-grid">
+                        <div class="field-group">
+                            <label class="field-label" for="workspaceName">Workspace Name</label>
+                            <input class="field" id="workspaceName" type="text" placeholder="My Workspace" required>
+                        </div>
+
+                        <div class="form-grid two">
+                            <div class="field-group">
+                                <label class="field-label" for="workspaceSlug">Workspace Slug</label>
+                                <input class="field" id="workspaceSlug" type="text" placeholder="my-workspace" required>
+                            </div>
+                            <div class="field-group">
+                                <label class="field-label" for="workspacePhone">Phone</label>
+                                <input class="field" id="workspacePhone" type="tel" placeholder="+998 90 123 45 67">
+                            </div>
+                        </div>
+
+                        <div class="field-group">
+                            <label class="field-label" for="workspaceDescription">Description</label>
+                            <textarea class="field" id="workspaceDescription" placeholder="java-500000 sum, location qarshi shahar" style="min-height: 100px; resize: vertical;" maxlength="300"></textarea>
+                            <div class="char-counter" id="charCounter">0 / 300 characters</div>
+                        </div>
+
+                        <button class="btn btn-primary btn-block" id="updateWorkspaceBtn" type="submit">Update Workspace</button>
+                    </form>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="deleteModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">Delete Workspace</div>
+                    <div class="modal-subtitle">This action cannot be undone. All data will be permanently deleted.</div>
+                </div>
+                <button class="btn btn-ghost" data-close-modal="deleteModal" type="button">Close</button>
+            </div>
+
+            <div style="padding: 24px;">
+                <div style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.2); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+                    <h4 style="color: var(--danger); margin: 0 0 8px 0; font-size: 16px;">⚠️ Warning</h4>
+                    <p style="color: var(--text); margin: 0; font-size: 14px; line-height: 1.5;">
+                        Deleting this workspace will permanently remove all associated data including:
+                        students, groups, leads, applications, payments, and settings.
+                    </p>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="confirmDelete">Type "DELETE" to confirm</label>
+                    <input class="field" id="confirmDelete" type="text" placeholder="DELETE" required>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                    <button class="btn btn-ghost btn-block" data-close-modal="deleteModal" type="button">Cancel</button>
+                    <button class="btn btn-danger btn-block" id="confirmDeleteBtn" type="button">Delete Workspace</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/app.js"></script>
+    <script>
+        let workspaceContext;
+        let currentWorkspace = null;
+
+        function formatDate(dateString) {
+            if (!dateString) return "No date";
+            return new Date(dateString).toLocaleDateString("uz-UZ", {
+                day: "2-digit",
+                month: "long",
+                year: "numeric"
+            });
+        }
+
+        function renderWorkspaceInfo(workspace) {
+            const subscriptionStatus = workspace.subscribed ? "active" : "inactive";
+            const subscriptionText = workspace.subscribed ? "Active" : "Inactive";
+
+            document.getElementById("workspaceInfo").innerHTML = `
+                <div class="info-item">
+                    <div class="info-label">Workspace ID</div>
+                    <div class="info-value">${SyntraApp.escapeHtml(workspace.id || "")}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Name</div>
+                    <div class="info-value">${SyntraApp.escapeHtml(workspace.name || "")}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Slug</div>
+                    <div class="info-value">${SyntraApp.escapeHtml(workspace.slug || "")}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Phone</div>
+                    <div class="info-value">${SyntraApp.escapeHtml(workspace.phone || "Not set")}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Created</div>
+                    <div class="info-value">${formatDate(workspace.created_at)}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Owner ID</div>
+                    <div class="info-value">${SyntraApp.escapeHtml(workspace.owner_id || "")}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Subscription</div>
+                    <div class="info-value">
+                        <span class="subscription-badge ${subscriptionStatus}">${subscriptionText}</span>
+                    </div>
+                </div>
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <div class="info-label">Description</div>
+                    <div class="info-value">${SyntraApp.escapeHtml(workspace.description || "No description")}</div>
+                </div>
+            `;
+        }
+
+        function updateCharCounter() {
+            const textarea = document.getElementById("workspaceDescription");
+            const counter = document.getElementById("charCounter");
+            const length = textarea.value.length;
+            const maxLength = 300;
+
+            counter.textContent = `${length} / ${maxLength} characters`;
+
+            if (length > maxLength * 0.9) {
+                counter.className = "char-counter warning";
+            } else if (length > maxLength) {
+                counter.className = "char-counter error";
+            } else {
+                counter.className = "char-counter";
+            }
+        }
+
+        async function loadWorkspace() {
+            const { data: workspace, error } = await SyntraApp.sb
+                .from("workspaces")
+                .select("*")
+                .eq("id", workspaceContext.workspace.id)
+                .single();
+
+            if (error) {
+                SyntraApp.showToast("Load failed", SyntraApp.parseError(error), "error");
+                return;
+            }
+
+            currentWorkspace = workspace;
+            renderWorkspaceInfo(workspace);
+
+            // Populate form
+            document.getElementById("workspaceName").value = workspace.name || "";
+            document.getElementById("workspaceSlug").value = workspace.slug || "";
+            document.getElementById("workspacePhone").value = workspace.phone || "";
+            document.getElementById("workspaceDescription").value = workspace.description || "";
+
+            updateCharCounter();
+        }
+
+        window.addEventListener("load", async () => {
+            workspaceContext = await SyntraApp.requireWorkspace("settings");
+            if (!workspaceContext) return;
+
+            // Character counter
+            document.getElementById("workspaceDescription").addEventListener("input", updateCharCounter);
+
+            // Update workspace form
+            document.getElementById("workspaceForm").addEventListener("submit", async (event) => {
+                event.preventDefault();
+                const updateBtn = document.getElementById("updateWorkspaceBtn");
+                SyntraApp.setButtonLoading(updateBtn, true, "Updating...");
+
+                const name = document.getElementById("workspaceName").value.trim();
+                const slug = document.getElementById("workspaceSlug").value.trim();
+                const phone = document.getElementById("workspacePhone").value.trim();
+                const description = document.getElementById("workspaceDescription").value.trim();
+
+                if (description.length > 300) {
+                    SyntraApp.showToast("Validation Error", "Description must be less than 300 characters", "error");
+                    SyntraApp.setButtonLoading(updateBtn, false);
+                    return;
+                }
+
+                const payload = {
+                    name,
+                    slug,
+                    phone,
+                    description
+                };
+
+                const { error } = await SyntraApp.sb
+                    .from("workspaces")
+                    .update(payload)
+                    .eq("id", currentWorkspace.id);
+
+                if (error) {
+                    SyntraApp.showToast("Update failed", SyntraApp.parseError(error), "error");
+                    SyntraApp.setButtonLoading(updateBtn, false);
+                    return;
+                }
+
+                SyntraApp.showToast("Workspace updated", "Settings saved successfully.");
+                SyntraApp.setButtonLoading(updateBtn, false);
+                loadWorkspace();
+            });
+
+            // Delete workspace
+            document.getElementById("deleteWorkspaceBtn").addEventListener("click", () => {
+                document.getElementById("confirmDelete").value = "";
+                SyntraApp.openModal("deleteModal");
+            });
+
+            document.getElementById("confirmDeleteBtn").addEventListener("click", async () => {
+                const confirmation = document.getElementById("confirmDelete").value.trim();
+                if (confirmation !== "DELETE") {
+                    SyntraApp.showToast("Confirmation required", "Please type 'DELETE' to confirm", "error");
+                    return;
+                }
+
+                const deleteBtn = document.getElementById("confirmDeleteBtn");
+                SyntraApp.setButtonLoading(deleteBtn, true, "Deleting...");
+
+                // Delete all related data first
+                const tables = [
+                    "workspace_applications",
+                    "group_students",
+                    "students",
+                    "leads",
+                    "payments",
+                    "groups"
+                ];
+
+                for (const table of tables) {
+                    await SyntraApp.sb.from(table).delete().eq("workspace_id", currentWorkspace.id);
+                }
+
+                // Delete workspace
+                const { error } = await SyntraApp.sb
+                    .from("workspaces")
+                    .delete()
+                    .eq("id", currentWorkspace.id);
+
+                if (error) {
+                    SyntraApp.showToast("Delete failed", SyntraApp.parseError(error), "error");
+                    SyntraApp.setButtonLoading(deleteBtn, false);
+                    return;
+                }
+
+                SyntraApp.showToast("Workspace deleted", "All data has been permanently removed.");
+                SyntraApp.setButtonLoading(deleteBtn, false);
+
+                // Redirect to workspace creation
+                setTimeout(() => {
+                    window.location.href = "workspace-create.html";
+                }, 2000);
+            });
+
+            loadWorkspace();
+        });
+    </script>
+</body>
+</html>
