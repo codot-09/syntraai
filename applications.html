@@ -9,34 +9,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/app.css">
-    <style>
-        .notification-badge {
-            position: relative;
-            display: inline-block;
-        }
-
-        .notification-badge.has-unread::after {
-            content: '';
-            position: absolute;
-            top: -4px;
-            right: -4px;
-            width: 10px;
-            height: 10px;
-            background: var(--danger);
-            border-radius: 50%;
-            animation: pulse-badge 2s infinite;
-        }
-
-        @keyframes pulse-badge {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-
-        .status-pending { color: var(--warning); font-weight: 600; }
-        .status-reviewed { color: var(--primary); font-weight: 600; }
-        .status-approved { color: var(--success); font-weight: 600; }
-        .status-rejected { color: var(--danger); font-weight: 600; }
-    </style>
 </head>
 <body>
     <div class="app-grid"></div>
@@ -54,7 +26,7 @@
             <header class="topbar">
                 <div class="topbar-left">
                     <h1>Applications</h1>
-                    <p>Manage and track student applications, monitor reviews, and streamline the admission process.</p>
+                    <p>Manage and track all incoming student applications and inquiries.</p>
                 </div>
                 <div class="topbar-actions">
                     <button class="btn btn-secondary" id="exportBtn" type="button">Export CSV</button>
@@ -68,15 +40,8 @@
                 <section class="panel">
                     <div class="controls">
                         <div class="search-wrap">
-                            <input class="search-field" id="searchInput" type="text" placeholder="Search by name, phone, or email">
+                            <input class="search-field" id="searchInput" type="text" placeholder="Search by phone or application text">
                         </div>
-                        <select class="select-field" id="statusFilter" style="max-width: 220px;">
-                            <option value="all">All statuses</option>
-                            <option value="pending">Pending</option>
-                            <option value="reviewed">Reviewed</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
-                        </select>
                     </div>
                 </section>
 
@@ -84,20 +49,10 @@
                     <div class="panel-header">
                         <div>
                             <div class="panel-title">Application pipeline</div>
-                            <div class="panel-subtitle">Track applications through the review and approval process.</div>
+                            <div class="panel-subtitle">Track all incoming applications and inquiries.</div>
                         </div>
                     </div>
                     <div class="table-wrap" id="appsTableWrap"></div>
-                </section>
-
-                <section class="panel">
-                    <div class="panel-header">
-                        <div>
-                            <div class="panel-title">Recent notifications</div>
-                            <div class="panel-subtitle">Latest updates on applications and reviews.</div>
-                        </div>
-                    </div>
-                    <div id="notificationsWrap" class="list-stack"></div>
                 </section>
             </div>
         </div>
@@ -108,7 +63,7 @@
             <div class="modal-header">
                 <div>
                     <div class="modal-title" id="appModalTitle">New application</div>
-                    <div class="modal-subtitle">Submit student application with contact information and message.</div>
+                    <div class="modal-subtitle">Submit student application with phone and message.</div>
                 </div>
                 <button class="btn btn-ghost" data-close-modal="appModal" type="button">Close</button>
             </div>
@@ -117,40 +72,13 @@
                 <input id="appId" type="hidden">
 
                 <div class="field-group">
-                    <label class="field-label" for="appName">Full name</label>
-                    <input class="field" id="appName" type="text" placeholder="Ali Valiyev" required>
-                </div>
-
-                <div class="form-grid two">
-                    <div class="field-group">
-                        <label class="field-label" for="appPhone">Phone</label>
-                        <input class="field" id="appPhone" type="tel" placeholder="+998 90 123 45 67" required>
-                    </div>
-                    <div class="field-group">
-                        <label class="field-label" for="appEmail">Email</label>
-                        <input class="field" id="appEmail" type="email" placeholder="ali@example.com">
-                    </div>
+                    <label class="field-label" for="appPhone">Phone</label>
+                    <input class="field" id="appPhone" type="tel" placeholder="+998 90 123 45 67" required>
                 </div>
 
                 <div class="field-group">
-                    <label class="field-label" for="appMessage">Message</label>
-                    <textarea class="field" id="appMessage" placeholder="Application message or notes" style="min-height: 120px; resize: vertical;"></textarea>
-                </div>
-
-                <div class="form-grid two">
-                    <div class="field-group">
-                        <label class="field-label" for="appStatus">Status</label>
-                        <select class="select-field" id="appStatus">
-                            <option value="pending">Pending</option>
-                            <option value="reviewed">Reviewed</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
-                        </select>
-                    </div>
-                    <div class="field-group">
-                        <label class="field-label" for="appSource">Source</label>
-                        <input class="field" id="appSource" type="text" placeholder="Website, Telegram, WhatsApp, etc.">
-                    </div>
+                    <label class="field-label" for="appMessage">Application message</label>
+                    <textarea class="field" id="appMessage" placeholder="Application text or inquiry" style="min-height: 120px; resize: vertical;" required></textarea>
                 </div>
 
                 <button class="btn btn-primary btn-block" id="saveAppBtn" type="submit">Save application</button>
@@ -162,49 +90,30 @@
     <script>
         let workspaceContext;
         let allApplications = [];
-        let allNotifications = [];
         let editingApp = null;
 
-        function statusBadgeClass(status) {
-            if (status === "approved") return "badge-success";
-            if (status === "reviewed") return "badge-warning";
-            if (status === "rejected") return "badge-danger";
-            return "badge-primary";
-        }
-
-        function normalizeStatus(status) {
-            const value = String(status || "pending").toLowerCase();
-            if (["approved", "tasdiqlangan"].includes(value)) return "approved";
-            if (["reviewed", "korilgan"].includes(value)) return "reviewed";
-            if (["rejected", "rad etilgan"].includes(value)) return "rejected";
-            if (["pending", "kutilmoqda"].includes(value)) return "pending";
-            return "pending";
-        }
-
         function renderStats() {
-            const pending = allApplications.filter((app) => normalizeStatus(app.status) === "pending").length;
-            const reviewed = allApplications.filter((app) => normalizeStatus(app.status) === "reviewed").length;
-            const approved = allApplications.filter((app) => normalizeStatus(app.status) === "approved").length;
-            const approvalRate = allApplications.length ? `${Math.round((approved / allApplications.length) * 100)}%` : "0%";
+            const totalApps = allApplications.length;
+            const recentApps = allApplications.filter((app) => {
+                const createdDate = new Date(app.created_at);
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                return createdDate >= sevenDaysAgo;
+            }).length;
 
             document.getElementById("statsGrid").innerHTML = [
-                SyntraApp.statCard("Total applications", String(allApplications.length), "All-time submissions"),
-                SyntraApp.statCard("Pending review", String(pending), "Awaiting action"),
-                SyntraApp.statCard("Reviewed", String(reviewed), "In evaluation"),
-                SyntraApp.statCard("Approval rate", approvalRate, `${approved} approved applications`)
+                SyntraApp.statCard("Total applications", String(totalApps), "All-time submissions"),
+                SyntraApp.statCard("Recent", String(recentApps), "Last 7 days"),
+                SyntraApp.statCard("Average", totalApps > 0 ? Math.round(totalApps / (new Date().getDate())) : "0", "Per day this month")
             ].join("");
         }
 
         function filteredApplications() {
             const term = document.getElementById("searchInput").value.trim().toLowerCase();
-            const status = document.getElementById("statusFilter").value;
 
             return allApplications.filter((app) => {
-                const haystack = `${app.name || ""} ${app.phone || ""} ${app.email || ""} ${app.source || ""}`.toLowerCase();
-                const matchesSearch = haystack.includes(term);
-                const normalized = normalizeStatus(app.status);
-                const matchesStatus = status === "all" ? true : normalized === status;
-                return matchesSearch && matchesStatus;
+                const haystack = `${app.phone || ""} ${app.application || ""}`.toLowerCase();
+                return haystack.includes(term);
             });
         }
 
@@ -213,7 +122,7 @@
             const apps = filteredApplications();
 
             if (!apps.length) {
-                container.innerHTML = SyntraApp.emptyState("No applications found", "Try another filter or create a new application.");
+                container.innerHTML = SyntraApp.emptyState("No applications found", "Try another search or create a new application.");
                 return;
             }
 
@@ -221,11 +130,8 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Name</th>
                             <th>Phone</th>
-                            <th>Email</th>
-                            <th>Status</th>
-                            <th>Source</th>
+                            <th>Application</th>
                             <th>Submitted</th>
                             <th>Actions</th>
                         </tr>
@@ -233,15 +139,12 @@
                     <tbody>
                         ${apps.map((app) => `
                             <tr>
-                                <td class="cell-primary">${SyntraApp.escapeHtml(app.name || "")}</td>
-                                <td>${SyntraApp.escapeHtml(app.phone || "")}</td>
-                                <td>${SyntraApp.escapeHtml(app.email || "-")}</td>
-                                <td><span class="badge ${statusBadgeClass(normalizeStatus(app.status))}">${SyntraApp.escapeHtml(normalizeStatus(app.status))}</span></td>
-                                <td>${SyntraApp.escapeHtml(app.source || "Unknown")}</td>
+                                <td class="cell-primary">${SyntraApp.escapeHtml(app.phone || "")}</td>
+                                <td>${SyntraApp.escapeHtml((app.application || "").substring(0, 100))}${(app.application || "").length > 100 ? "..." : ""}</td>
                                 <td>${SyntraApp.escapeHtml(SyntraApp.formatDate(app.created_at))}</td>
                                 <td>
                                     <div class="table-actions">
-                                        <button class="btn btn-secondary" type="button" onclick="editApp('${app.id}')">Edit</button>
+                                        <button class="btn btn-secondary" type="button" onclick="editApp('${app.id}')">View</button>
                                         <button class="btn btn-danger" type="button" onclick="deleteApp('${app.id}')">Delete</button>
                                     </div>
                                 </td>
@@ -252,45 +155,15 @@
             `;
         }
 
-        function renderNotifications() {
-            const container = document.getElementById("notificationsWrap");
-            const recentNotifs = allNotifications.slice(0, 6);
-
-            if (!recentNotifs.length) {
-                container.innerHTML = SyntraApp.emptyState("No notifications", "All applications are up to date.");
-                return;
-            }
-
-            container.innerHTML = recentNotifs.map((notif) => {
-                const unreadClass = !notif.is_read ? "font-weight: 600;" : "";
-                return `
-                    <div class="list-item" style="padding: 12px 16px; border-bottom: 1px solid var(--border); ${unreadClass}">
-                        <div class="list-title">${SyntraApp.escapeHtml(notif.title || "")}</div>
-                        <div class="list-meta">${SyntraApp.escapeHtml(notif.message || "")}</div>
-                        <div class="list-meta" style="font-size: 12px; margin-top: 4px;">${SyntraApp.escapeHtml(SyntraApp.formatDate(notif.created_at))}</div>
-                    </div>
-                `;
-            }).join("");
-        }
-
         async function refreshData() {
-            const [appsRes, notifsRes] = await Promise.all([
-                SyntraApp.sb.from("workspace_applications")
-                    .select("*")
-                    .eq("workspace_id", workspaceContext.workspace.id)
-                    .order("created_at", { ascending: false }),
-                SyntraApp.sb.from("notifications")
-                    .select("*")
-                    .eq("workspace_id", workspaceContext.workspace.id)
-                    .order("created_at", { ascending: false })
-                    .limit(20)
-            ]);
+            const appsRes = await SyntraApp.sb.from("workspace_applications")
+                .select("*")
+                .eq("workspace_id", workspaceContext.workspace.id)
+                .order("created_at", { ascending: false });
 
             allApplications = appsRes.data || [];
-            allNotifications = notifsRes.data || [];
             renderStats();
             renderApplications();
-            renderNotifications();
         }
 
         window.editApp = function editApp(id) {
@@ -298,13 +171,9 @@
             if (!editingApp) return;
 
             document.getElementById("appId").value = editingApp.id;
-            document.getElementById("appName").value = editingApp.name || "";
             document.getElementById("appPhone").value = editingApp.phone || "";
-            document.getElementById("appEmail").value = editingApp.email || "";
             document.getElementById("appMessage").value = editingApp.application || "";
-            document.getElementById("appStatus").value = editingApp.status || "pending";
-            document.getElementById("appSource").value = editingApp.source || "";
-            document.getElementById("appModalTitle").textContent = "Edit application";
+            document.getElementById("appModalTitle").textContent = "View application";
             SyntraApp.openModal("appModal");
         };
 
@@ -316,16 +185,6 @@
                 SyntraApp.showToast("Delete failed", SyntraApp.parseError(error), "error");
                 return;
             }
-            
-            // Create notification
-            await SyntraApp.sb.from("notifications").insert([{
-                workspace_id: workspaceContext.workspace.id,
-                title: "Application deleted",
-                message: "An application has been removed from the system.",
-                type: "info",
-                is_read: false,
-                created_at: new Date().toISOString()
-            }]);
             
             SyntraApp.showToast("Application deleted", "The application has been removed.");
             refreshData();
@@ -340,22 +199,18 @@
                 document.getElementById("appForm").reset();
                 document.getElementById("appId").value = "";
                 document.getElementById("appModalTitle").textContent = "New application";
+                document.getElementById("saveAppBtn").textContent = "Save application";
                 SyntraApp.openModal("appModal");
             });
 
             document.getElementById("searchInput").addEventListener("input", renderApplications);
-            document.getElementById("statusFilter").addEventListener("change", renderApplications);
 
             document.getElementById("exportBtn").addEventListener("click", () => {
-                const headers = ["Name", "Phone", "Email", "Status", "Source", "Submitted", "Message"];
+                const headers = ["Phone", "Application", "Submitted"];
                 const rows = filteredApplications().map((app) => [
-                    app.name || "",
                     app.phone || "",
-                    app.email || "",
-                    normalizeStatus(app.status),
-                    app.source || "",
-                    SyntraApp.formatDate(app.created_at),
-                    app.application || ""
+                    app.application || "",
+                    SyntraApp.formatDate(app.created_at)
                 ]);
                 SyntraApp.exportCsv("applications.csv", headers, rows);
             });
@@ -366,20 +221,12 @@
                 SyntraApp.setButtonLoading(saveBtn, true, "Saving...");
 
                 const id = document.getElementById("appId").value;
-                const name = document.getElementById("appName").value.trim();
                 const phone = document.getElementById("appPhone").value.trim();
-                const email = document.getElementById("appEmail").value.trim();
-                const message = document.getElementById("appMessage").value.trim();
-                const status = document.getElementById("appStatus").value;
-                const source = document.getElementById("appSource").value.trim();
+                const application = document.getElementById("appMessage").value.trim();
 
                 const payload = {
-                    name,
                     phone,
-                    email,
-                    application: message,
-                    status,
-                    source,
+                    application,
                     workspace_id: workspaceContext.workspace.id
                 };
 
@@ -393,29 +240,7 @@
                     return;
                 }
 
-                // Create notification for new application
-                if (!id) {
-                    await SyntraApp.sb.from("notifications").insert([{
-                        workspace_id: workspaceContext.workspace.id,
-                        title: `New application from ${name}`,
-                        message: `Phone: ${phone}`,
-                        type: "info",
-                        is_read: false,
-                        created_at: new Date().toISOString()
-                    }]);
-                } else {
-                    // Create notification for updated application
-                    await SyntraApp.sb.from("notifications").insert([{
-                        workspace_id: workspaceContext.workspace.id,
-                        title: `Application updated`,
-                        message: `${name}'s application status changed to ${status}`,
-                        type: "info",
-                        is_read: false,
-                        created_at: new Date().toISOString()
-                    }]);
-                }
-
-                SyntraApp.showToast(id ? "Application updated" : "Application submitted", "Application information saved.");
+                SyntraApp.showToast(id ? "Application updated" : "Application submitted", "Application saved successfully.");
                 SyntraApp.closeModal("appModal");
                 SyntraApp.setButtonLoading(saveBtn, false);
                 refreshData();
