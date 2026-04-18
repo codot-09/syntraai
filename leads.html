@@ -398,10 +398,10 @@
                     }]);
                 }
 
-                // 3. Delete Lead
-                await SyntraApp.sb.from("leads").delete().eq("id", leadId);
+                // 3. Update Lead status to "enrolled" but keep the lead record for analysis
+                await SyntraApp.sb.from("leads").update({ status: "enrolled" }).eq("id", leadId);
 
-                SyntraApp.showToast("Lead converted", "Student created and lead record removed.");
+                SyntraApp.showToast("Lead converted", "Student created successfully. Lead kept for historical analysis.");
                 SyntraApp.closeModal("convertModal");
                 SyntraApp.setButtonLoading(convertBtn, false);
                 refreshData();

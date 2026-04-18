@@ -7,8 +7,9 @@ const SyntraApp = (() => {
         { key: "dashboard", label: "Dashboard", href: "dashboard.html" },
         { key: "groups", label: "Groups", href: "groups.html" },
         { key: "students", label: "Students", href: "students.html" },
-        { key: "payment", label: "Payments", href: "payment.html" },
-        { key: "leads", label: "Leads", href: "leads.html" }
+        { key: "leads", label: "Leads", href: "leads.html" },
+        { key: "applications", label: "Applications", href: "applications.html" },
+        { key: "payment", label: "Payments", href: "payment.html" }
     ];
 
     function qs(selector, root = document) {
